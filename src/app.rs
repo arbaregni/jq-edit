@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tui_textarea::TextArea;
 
 use crate::{cli::Cli, jq};
 
@@ -11,7 +12,7 @@ pub struct App {
     pub filtered: String,
 
     /// The current working query
-    pub query_buf: String,
+    pub query_editor: TextArea<'static>,
 
     /// True if the query buf has changed since last update
     pub query_changed: bool,
@@ -34,18 +35,21 @@ impl App {
         App {
             original: original.clone(),
             filtered: original,
-            query_buf: String::with_capacity(10),
+            query_editor: TextArea::default(),
             query_changed: true,
             run: true,
             error: None,
         }
     }
 
+    pub fn query_content(&self) -> &str {
+        self.query_editor.lines()[0].as_str()
+    }
     pub fn update(&mut self, cli: &Cli) -> Result<()> {
         // update the filters
 
         if self.query_changed {
-            let out = jq::apply_filter(&cli, self.original.as_str(), self.query_buf.as_str())?;
+            let out = jq::apply_filter(&cli, self.original.as_str(), self.query_content())?;
 
             match out {
                  jq::JqOutput::Success { json_content } => {
@@ -67,4 +71,8 @@ impl App {
         Ok(())
     }
 
+    /// Called when the user presses enter. Runs the query again
+    pub fn submit_message(&mut self) {
+        self.query_changed = true;
+    }
 }

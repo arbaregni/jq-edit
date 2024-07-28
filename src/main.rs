@@ -2,12 +2,16 @@ mod cli;
 mod jq;
 mod ui;
 mod app;
-mod events;
+mod input;
+mod my_line_editor;
 
-use std::{io::{
-    self,
-    Read,
-}, panic};
+use std::{
+    io::{
+        self,
+        Read,
+    },
+    panic
+};
 
 use anyhow::Result;
 use clap::Parser;
@@ -44,6 +48,7 @@ fn main() {
 
     let mut app = crate::app::App::init(source);
 
+
     run(&cli, &mut app)
         .expect("running app");
 }
@@ -69,8 +74,10 @@ fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
     let mut term = Terminal::new(backend)?;
 
     while app.run {
+        ui::set_query_editor_styles(app);
         term.draw(|f| ui::render_app(app, f))?;
-        events::handle_events(app)?;
+
+        input::handle_events(app)?;
         app.update(cli)?;
     }
 
