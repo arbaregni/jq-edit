@@ -20,9 +20,14 @@ pub struct App {
     pub run: bool,
     
     /// Present if there is some error message to display
-    pub error: Option<String>,
+    pub error: Option<ErrorPanel>,
 }
 
+#[derive(Debug)]
+pub struct ErrorPanel {
+    pub title: String,
+    pub failure: String,
+}
 
 impl App {
     pub fn init(original: String) -> App {
@@ -47,8 +52,12 @@ impl App {
                      self.filtered = json_content;
                      self.error = None;
                  }
-                 jq::JqOutput::Failure { failure } => {
-                     self.error = Some(failure);
+                 jq::JqOutput::Failure { title, failure } => {
+                     // do NOT overwrite previous content on a fail, just show last good state
+                     self.error = Some(ErrorPanel {
+                         title,
+                         failure
+                    });
                  }
              }
 

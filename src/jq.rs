@@ -14,6 +14,7 @@ pub enum JqOutput {
         json_content: String
     },
     Failure {
+        title: String,
         failure: String,
     },
 }
@@ -32,23 +33,30 @@ pub fn apply_filter(_cli: &Cli, source: &str, query: &str) -> Result<JqOutput> {
     let (stdout, stderr) = process.communicate(Some(source))?;
     let exit_status = process.wait()?;
 
+    let stdout = stdout.unwrap_or(format!("<missing stdout>"));
+    let stderr = stderr.unwrap_or(format!("<missing stderr>"));
+
     // translate the shell program's output
     let output = match exit_status {
         ExitStatus::Exited(rc) => match rc {
             0 => JqOutput::Success {
-                json_content: stdout.expect("read stdout"),
+                json_content: stdout
             },
             _ => JqOutput::Failure {
-                failure: format!("jq subprocess exited with exit code {rc}: {stderr:?}")
+                title: format!("jq subprocess exittied with exit code {rc}"),
+                failure: stderr,
             }
         },
         ExitStatus::Signaled(x) => JqOutput::Failure {
+            title: format!("error"),
             failure: format!("the jq subprocess exited due to a signal {x}")
         },
         ExitStatus::Other(x) => JqOutput::Failure {
+            title: format!("error"),
             failure: format!("This should not occur. The jq subprocess exited (other - {x})"),
         },
         ExitStatus::Undetermined => JqOutput::Failure {
+            title: format!("error"),
             failure: format!("undetermined exit status of jq subprocess")
         },
     };

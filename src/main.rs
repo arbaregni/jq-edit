@@ -4,10 +4,10 @@ mod ui;
 mod app;
 mod events;
 
-use std::io::{
+use std::{io::{
     self,
     Read,
-};
+}, panic};
 
 use anyhow::Result;
 use clap::Parser;
@@ -49,8 +49,21 @@ fn main() {
 }
 
 fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
+    // Set up the terminal for rendering
     enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?;
+
+    // Restore the terminal on program failure
+    let default_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        match cleanup() {
+            Ok(()) => {},
+            Err(e) => {
+                eprintln!("during attempted cleanup, an error occured: {e}");
+            }
+        };
+        default_hook(info);
+    }));
 
     let backend = CrosstermBackend::new(io::stdout());
     let mut term = Terminal::new(backend)?;
@@ -61,8 +74,14 @@ fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
         app.update(cli)?;
     }
 
-    disable_raw_mode()?;
-    io::stdout().execute(LeaveAlternateScreen)?;
+    cleanup()?;
 
     Ok(())
 }
+
+fn cleanup() -> Result<()> {
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
+}
+
