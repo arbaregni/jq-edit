@@ -51,6 +51,8 @@ fn main() {
 
     run(&cli, &mut app)
         .expect("running app");
+
+    println!("QUERY: {}", app.query_content());
 }
 
 fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
