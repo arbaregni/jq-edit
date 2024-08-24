@@ -8,16 +8,16 @@ mod my_line_editor;
 mod parse;
 
 use std::{
-    io::{
+    fs::{self, File}, io::{
         self,
         Read,
-    },
-    panic
+    }, panic, time::SystemTime
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 
+use directories::ProjectDirs;
 use ratatui::{
     crossterm::{
         terminal::{
@@ -28,6 +28,45 @@ use ratatui::{
     prelude::*,
 };
 
+const LOG_FOLDER_NAME: &str = "logs";
+/// How many old runs to keep in the log folder
+const MAX_LOG_RUNS_SAVED: usize = 20;
+
+fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<()> {
+    // ~/.cache/jq-edit
+    let log_folder = project_dirs.cache_dir().to_path_buf().join(LOG_FOLDER_NAME);
+
+    // ensure it exists
+    if !log_folder.exists() {
+        fs::create_dir_all(&log_folder)
+            .with_context(|| format!("creating log folder at {}", log_folder.display()))?;
+    }
+
+    // create the newest log run
+    let now = chrono::Utc::now();
+    let filename = format!("run-{}.log", now.format("%Y-%m-%d-%H-%M-%S"));
+    let filepath = log_folder.join(filename);
+
+    let log_file = fern::log_file(filepath)
+        .with_context(|| format!("creating new log in {}", log_folder.display()))?;
+
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            let now = chrono::Utc::now();
+            out.finish(format_args!(
+                "{} [{}] {} {}",
+                now.format("%Y-%m-%dT%H:%M:%S"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(cli.log_level)
+        .chain(log_file)
+        .apply()?;
+
+    Ok(())
+}
 
 fn read_stdin() -> Result<String> {
     let mut buf = String::new();
@@ -36,17 +75,19 @@ fn read_stdin() -> Result<String> {
 }
 
 
-fn main() {
+fn main() -> Result<()> {
     let cli = cli::Cli::parse();
 
-    pretty_env_logger::formatted_timed_builder()
-        .filter(None, cli.log_level)
-        .init();
+    let project_dirs = ProjectDirs::from("", "arbaregni", "jq-edit").expect("initialize project directories");
+
+    configure_logging(&cli, &project_dirs)?;
 
     log::info!("reading from stdin");
     let source = read_stdin().unwrap();
 
-    log::debug!("source = {source}");
+    // since it's just going to be around for the entire life of the program,
+    // just leak the string now and let the OS deal with it
+    let source = source.leak();
 
     let mut app = crate::app::App::init(source);
 
@@ -54,6 +95,8 @@ fn main() {
         .expect("running app");
 
     println!("QUERY: {}", app.query_content());
+
+    Ok(())
 }
 
 fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {

@@ -1,12 +1,62 @@
 
 use crate::cli::Cli;
 
+use std::sync::mpsc::{
+    channel, Receiver, Sender, TryRecvError
+};
+use std::thread;
+
 use anyhow::Result;
 use subprocess::{
     ExitStatus, Popen, PopenConfig, Redirection
 };
 
 const JQ_EXE_NAME: &str = "jq";
+
+#[derive(Debug)]
+pub struct JqJob {
+    rx: Receiver<JqOutput>
+}
+
+impl JqJob {
+    pub fn new(_cli: &Cli, source: &'static str, query: String) -> JqJob {
+        let (tx, rx) = channel();
+        thread::spawn(move || {
+            let result = apply_filter(source, query);
+            let out = match result {
+                Ok(out) => out,
+                Err(e) => {
+                    log::error!("jq worker exitted with error: {e}");
+                    JqOutput::Failure {
+                        title: format!("fault"),
+                        failure: format!("jq worker exitted with error: {e}")
+                    }
+                }
+            };
+            tx.send(out);
+        });
+        JqJob { rx }
+    }
+    /// Get the output of the command, if it is ready
+    pub fn output(&self) -> Option<JqOutput> {
+        match self.rx.try_recv() {
+            Ok(out) => Some(out),
+            Err(TryRecvError::Disconnected) => Some(JqOutput::Failure {
+                title: format!("fault"),
+                failure: format!("channel to jq worker thread disconnected")
+            }),
+            Err(TryRecvError::Empty) => None,
+        }
+
+    }
+    pub fn extract_output_once_done(maybe_job: &mut Option<JqJob>) -> Option<JqOutput> {
+        let Some(job) = maybe_job else { return None; };
+        let Some(output) = job.output() else { return None; };
+
+        *maybe_job = None;
+        Some(output)
+    }
+}
 
 #[derive(Debug)]
 pub enum JqOutput {
@@ -18,10 +68,9 @@ pub enum JqOutput {
         failure: String,
     },
 }
-
-pub fn apply_filter(_cli: &Cli, source: &str, query: &str) -> Result<JqOutput> {
+fn apply_filter(source: &'static str, query: String) -> Result<JqOutput> {
     let mut process = Popen::create(
-        &[JQ_EXE_NAME, query],
+        &[JQ_EXE_NAME, query.as_str()],
         PopenConfig {
             stdin: Redirection::Pipe,
             stdout: Redirection::Pipe,
@@ -52,18 +101,20 @@ pub fn apply_filter(_cli: &Cli, source: &str, query: &str) -> Result<JqOutput> {
             }
         },
         ExitStatus::Signaled(x) => JqOutput::Failure {
-            title: format!("error"),
+            title: format!("fault"),
             failure: format!("the jq subprocess exited due to a signal {x}")
         },
         ExitStatus::Other(x) => JqOutput::Failure {
-            title: format!("error"),
+            title: format!("fault"),
             failure: format!("This should not occur. The jq subprocess exited (other - {x})"),
         },
         ExitStatus::Undetermined => JqOutput::Failure {
-            title: format!("error"),
+            title: format!("fault"),
             failure: format!("undetermined exit status of jq subprocess")
         },
     };
 
     Ok(output)
 }
+
+

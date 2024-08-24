@@ -1,12 +1,17 @@
 use anyhow::Result;
 use tui_textarea::TextArea;
 
-use crate::{cli::Cli, jq};
+use crate::{
+    cli::Cli,
+    jq::{
+        self, JqJob
+    }
+};
 
 #[derive(Debug)]
 pub struct App {
     /// The original json data from standard in.
-    pub original: String,
+    pub original: &'static str,
 
     /// The current json data as filtered down by the current query.
     pub filtered: String,
@@ -16,6 +21,8 @@ pub struct App {
 
     /// True if the query buf has changed since last update
     pub query_changed: bool,
+
+    pub running_query: Option<JqJob>,
 
     /// True while the app should be running.
     pub run: bool,
@@ -34,12 +41,13 @@ pub struct ErrorPanel {
 }
 
 impl App {
-    pub fn init(original: String) -> App {
+    pub fn init(original: &'static str) -> App {
         App {
-            original: original.clone(),
-            filtered: original,
+            original,
+            filtered: original.to_string(),
             query_editor: TextArea::default(),
             query_changed: true,
+            running_query: None,
             run: true,
             error: None,
             clear_screen: false,
@@ -49,15 +57,21 @@ impl App {
     pub fn query_content(&self) -> &str {
         self.query_editor.lines()[0].as_str()
     }
+
     pub fn update(&mut self, cli: &Cli) -> Result<()> {
         // update the filters
 
         if self.query_changed || cli.refresh_jq_every_frame {
-            
-            // TODO: this should happen asynchronously
-            let out = jq::apply_filter(&cli, self.original.as_str(), self.query_content())?;
+            // TODO: cancel the currently running query if there is one
 
-            match out {
+            let job = JqJob::new(cli, self.original, self.query_content().to_string());
+            self.running_query = Some(job);
+
+        }
+
+        if let Some(output) = JqJob::extract_output_once_done(&mut self.running_query) {
+
+            match output {
                  jq::JqOutput::Success { json_content } => {
                      self.filtered = json_content;
                      self.error = None;
@@ -73,6 +87,7 @@ impl App {
 
             self.query_changed = false;
             self.clear_screen = true;
+
         }
 
         Ok(())
