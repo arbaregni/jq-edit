@@ -12,6 +12,7 @@ static PATTERN_TOKENS: Lazy<Vec<(TokenType, Regex)>> = Lazy::new(|| {
         (TokenType::Colon, Regex::new(r"^:").expect("compile regex")),
         (TokenType::Newline, Regex::new(r"^\r?\n").expect("compile regex")),
         (TokenType::Whitespace, Regex::new(r"^[ \t]+").expect("compile regex")),
+        (TokenType::Boolean, Regex::new(r"^true|false").expect("compile regex")),
         (TokenType::String, Regex::new(r#"^"(?:[^"\\]|\\.)*""#).expect("compile regex")),
         // Splitting up the numbers into 3 patterns for clarity
         (TokenType::Number, Regex::new(r"^-?\d*\.\d+").expect("compile regex")),
@@ -33,6 +34,7 @@ pub enum TokenType {
     Newline,
     String,
     Number,
+    Boolean,
     InvalidChar,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]

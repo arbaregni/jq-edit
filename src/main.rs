@@ -6,7 +6,7 @@ mod app;
 mod input;
 mod my_line_editor;
 mod scroll_text;
-mod parse;
+mod tokens;
 
 use std::{
     fs::{self, File}, io::{

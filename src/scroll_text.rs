@@ -2,6 +2,8 @@ use ratatui::{
     buffer::Buffer, layout::Rect, style::Style, text::Line, widgets::{block::BlockExt, Block, Widget}
 };
 
+use crate::{tokens::{self, Token, TokenType}, ui};
+
 #[derive(Debug)]
 pub struct ScrollText<'a> {
     // the lines to render
@@ -14,12 +16,38 @@ pub struct ScrollText<'a> {
 impl <'a> ScrollText<'a> {
     pub fn from(content: String) -> ScrollText<'a> {
         // TODO: how to avoid all the copying here??
+        ScrollText::from_content(content)
+    }
+
+    pub fn from_content(content: String) -> ScrollText<'a> {
         let lines = content.lines()
             .map(|l| Line::from(l.to_string()))
             .collect();
+
         Self {
             line_offset: 0,
             lines,
+        } 
+    }
+    pub fn from_tokens<'b>(tokens: &[Token<'b>]) -> ScrollText<'a> {
+        let mut lines = Vec::new();
+        let mut curr_line = Vec::new();
+        for tok in tokens {
+
+            let span = ui::token_to_span(tok);
+
+            curr_line.push(span);
+
+            if tok.tty == TokenType::Newline {
+                let line = Line::from(curr_line.clone());
+                lines.push(line);
+                curr_line.clear();
+            }
+        }
+
+        Self {
+            line_offset: 0,
+            lines
         }
     }
 

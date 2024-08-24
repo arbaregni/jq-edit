@@ -6,7 +6,7 @@ use ratatui::{
 
 use crate::{
     app::{App, ErrorPanel},
-    parse::{Token, TokenType}, scroll_text::ScrollText,
+    tokens::{Token, TokenType}, scroll_text::ScrollText,
 };
 
 
@@ -89,33 +89,17 @@ fn render_error_panel(err: &ErrorPanel, frame: &mut Frame, size: Rect) {
     frame.render_widget(para, size);
 }
 
-pub fn tokens_to_text<'a>(tokens: &[Token<'a>], text: &mut Text<'a>) {
 
-    text.lines.clear();
-    let mut curr_line = Vec::new();
 
-    for tok in tokens {
-
-        let span = token_to_span(tok);
-        curr_line.push(span);
-
-        if tok.tty == TokenType::Newline {
-            let line = Line::from(curr_line.clone());
-            text.lines.push(line);
-            curr_line.clear();
-        }
-        
-    }
-}
-
-fn token_to_span<'a>(tok: &Token<'a>) -> Span<'a> {
+pub fn token_to_span<'a>(tok: &Token<'a>) -> Span<'static> {
     let style = match tok.tty {
         TokenType::OpenBrace | TokenType::CloseBrace  | TokenType::OpenBracket 
             | TokenType::CloseBracket  | TokenType::Comma  | TokenType::Colon  
             | TokenType::Whitespace  | TokenType::Newline => Style::default(),
         TokenType::String => Style::default().fg(Color::Green),
-        TokenType::Number => Style::default().fg(Color::Yellow),
+        TokenType::Number => Style::default().fg(Color::Blue),
+        TokenType::Boolean => Style::default().fg(Color::Yellow),
         TokenType::InvalidChar => Style::default().fg(Color::White).bg(Color::Red),
     };
-    Span::styled(tok.lex, style)
+    Span::styled(tok.lex.to_string(), style)
 }

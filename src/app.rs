@@ -3,10 +3,9 @@ use ratatui::widgets::Block;
 use tui_textarea::TextArea;
 
 use crate::{
-    cli::Cli,
-    jq::{
+    cli::Cli, jq::{
         self, JqClient
-    }, scroll_text::ScrollText
+    }, tokens, scroll_text::ScrollText
 };
 
 #[derive(Debug)]
@@ -99,7 +98,9 @@ impl App {
     pub fn set_display_content(&mut self, content: String) {
         // todo: do we need this?
         self.filtered = content.clone();
-        self.scroll_text = ScrollText::from(content);
+
+        let tokens = tokens::tokenize(content.as_str());
+        self.scroll_text = ScrollText::from_tokens(tokens.as_slice());
     }
 
     /// Called when the user scrolls the text area
