@@ -6,7 +6,7 @@ use ratatui::{
 
 use crate::{
     app::{App, ErrorPanel},
-    parse::{Token, TokenType},
+    parse::{Token, TokenType}, scroll_text::ScrollText,
 };
 
 
@@ -31,16 +31,20 @@ pub fn render_app(app: &App, frame: &mut Frame) {
 
     // Render the filtered content
     {
-        let block = Block::bordered();
-
         // TODO: not every frame please !
         // let tokens = parse::tokenize(&app.filtered);
         // let mut text = Text::default();
         // tokens_to_text(&tokens, &mut text);
 
-        let para = Paragraph::new(app.filtered.as_str())
+        // let text = Paragraph::new(app.filtered.as_str())
+        //    .block(block);
+
+        let block = Block::bordered();
+
+        let w = app.scroll_text.widget()
             .block(block);
-        frame.render_widget(para, filtered_content);
+
+        frame.render_widget(w, filtered_content);
     }
 
     // render the current query

@@ -38,7 +38,7 @@ pub fn handle_events(app: &mut App) -> Result<()> {
             // Scrolling the text area up
             app.scroll_up();
         }
-        Event::Key(KeyEvent { code: KeyCode::Up, .. }) => {
+        Event::Key(KeyEvent { code: KeyCode::Down, .. }) => {
             // Scrolling the text area up
             app.scroll_down();
         }

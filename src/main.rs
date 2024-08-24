@@ -5,6 +5,7 @@ mod ui;
 mod app;
 mod input;
 mod my_line_editor;
+mod scroll_text;
 mod parse;
 
 use std::{

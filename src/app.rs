@@ -1,11 +1,12 @@
 use anyhow::Result;
+use ratatui::widgets::Block;
 use tui_textarea::TextArea;
 
 use crate::{
     cli::Cli,
     jq::{
         self, JqClient
-    }
+    }, scroll_text::ScrollText
 };
 
 #[derive(Debug)]
@@ -15,6 +16,8 @@ pub struct App {
 
     /// The current json data as filtered down by the current query.
     pub filtered: String,
+
+    pub scroll_text: ScrollText<'static>,
 
     /// The current working query
     pub query_editor: TextArea<'static>,
@@ -41,6 +44,7 @@ impl App {
     pub fn init(original: &'static str) -> App {
         App {
             original,
+            scroll_text: ScrollText::from(original.to_string()),
             filtered: original.to_string(),
             query_editor: TextArea::default(),
             jq_client: JqClient::new(),
@@ -66,8 +70,8 @@ impl App {
             match output {
                  jq::JqOutput::Success { json_content } => {
                      log::info!("received a successful response from jq, changing our filtered content now");
-                     self.filtered = json_content;
                      self.error = None;
+                     self.set_display_content(json_content);
                  }
                  jq::JqOutput::Failure { title, failure } => {
                      // do NOT overwrite previous content on a fail, just show last good state
@@ -92,12 +96,20 @@ impl App {
         self.jq_client.submit_query(self.original, query_content)
     }
 
+    pub fn set_display_content(&mut self, content: String) {
+        // todo: do we need this?
+        self.filtered = content.clone();
+        self.scroll_text = ScrollText::from(content);
+    }
+
     /// Called when the user scrolls the text area
     pub fn scroll_up(&mut self) {
-        log::info!("TODO: scroll up");
+        log::info!("scroll up");
+        self.scroll_text.scroll_up();
     }
     /// Called when the user scrolls the text area
     pub fn scroll_down(&mut self) {
-        log::info!("TODO: scroll down");
+        log::info!("scroll down");
+        self.scroll_text.scroll_down();
     }
 }
