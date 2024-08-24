@@ -33,8 +33,12 @@ pub fn apply_filter(_cli: &Cli, source: &str, query: &str) -> Result<JqOutput> {
     let (stdout, stderr) = process.communicate(Some(source))?;
     let exit_status = process.wait()?;
 
+    log::info!("jq exitted with {exit_status:?}");
+
     let stdout = stdout.unwrap_or(format!("<missing stdout>"));
     let stderr = stderr.unwrap_or(format!("<missing stderr>"));
+
+    log::info!("stdout = {stdout}, stderr = {stderr}");
 
     // translate the shell program's output
     let output = match exit_status {

@@ -22,6 +22,9 @@ pub struct App {
     
     /// Present if there is some error message to display
     pub error: Option<ErrorPanel>,
+
+    /// Seems that after an interaction with jq, we should clear the screen and force a redraw
+    pub clear_screen: bool,
 }
 
 #[derive(Debug)]
@@ -39,6 +42,7 @@ impl App {
             query_changed: true,
             run: true,
             error: None,
+            clear_screen: false,
         }
     }
 
@@ -48,7 +52,9 @@ impl App {
     pub fn update(&mut self, cli: &Cli) -> Result<()> {
         // update the filters
 
-        if self.query_changed {
+        if self.query_changed || cli.refresh_jq_every_frame {
+            
+            // TODO: this should happen asynchronously
             let out = jq::apply_filter(&cli, self.original.as_str(), self.query_content())?;
 
             match out {
@@ -66,6 +72,7 @@ impl App {
              }
 
             self.query_changed = false;
+            self.clear_screen = true;
         }
 
         Ok(())

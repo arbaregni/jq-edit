@@ -1,13 +1,13 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{
+    layout::{Constraint, Direction, Layout, Rect}, style::{
         Color, Modifier, Style
-    },
-    terminal::Frame,
-    widgets::{Block, Borders, Padding, Paragraph}
+    }, terminal::Frame, text::{Line, Span, Text}, widgets::{Block, Borders, Padding, Paragraph}
 };
 
-use crate::app::{App, ErrorPanel};
+use crate::{
+    app::{App, ErrorPanel},
+    parse::{Token, TokenType},
+};
 
 
 pub fn render_app(app: &App, frame: &mut Frame) {
@@ -32,6 +32,12 @@ pub fn render_app(app: &App, frame: &mut Frame) {
     // Render the filtered content
     {
         let block = Block::bordered();
+
+        // TODO: not every frame please !
+        // let tokens = parse::tokenize(&app.filtered);
+        // let mut text = Text::default();
+        // tokens_to_text(&tokens, &mut text);
+
         let para = Paragraph::new(app.filtered.as_str())
             .block(block);
         frame.render_widget(para, filtered_content);
@@ -77,4 +83,35 @@ fn render_error_panel(err: &ErrorPanel, frame: &mut Frame, size: Rect) {
         .block(block);
 
     frame.render_widget(para, size);
+}
+
+pub fn tokens_to_text<'a>(tokens: &[Token<'a>], text: &mut Text<'a>) {
+
+    text.lines.clear();
+    let mut curr_line = Vec::new();
+
+    for tok in tokens {
+
+        let span = token_to_span(tok);
+        curr_line.push(span);
+
+        if tok.tty == TokenType::Newline {
+            let line = Line::from(curr_line.clone());
+            text.lines.push(line);
+            curr_line.clear();
+        }
+        
+    }
+}
+
+fn token_to_span<'a>(tok: &Token<'a>) -> Span<'a> {
+    let style = match tok.tty {
+        TokenType::OpenBrace | TokenType::CloseBrace  | TokenType::OpenBracket 
+            | TokenType::CloseBracket  | TokenType::Comma  | TokenType::Colon  
+            | TokenType::Whitespace  | TokenType::Newline => Style::default(),
+        TokenType::String => Style::default().fg(Color::Green),
+        TokenType::Number => Style::default().fg(Color::Yellow),
+        TokenType::InvalidChar => Style::default().fg(Color::White).bg(Color::Red),
+    };
+    Span::styled(tok.lex, style)
 }

@@ -5,6 +5,7 @@ mod ui;
 mod app;
 mod input;
 mod my_line_editor;
+mod parse;
 
 use std::{
     io::{
@@ -38,16 +39,16 @@ fn read_stdin() -> Result<String> {
 fn main() {
     let cli = cli::Cli::parse();
 
-
     pretty_env_logger::formatted_timed_builder()
-        .filter(None, cli.level_filter)
+        .filter(None, cli.log_level)
         .init();
 
     log::info!("reading from stdin");
     let source = read_stdin().unwrap();
 
-    let mut app = crate::app::App::init(source);
+    log::debug!("source = {source}");
 
+    let mut app = crate::app::App::init(source);
 
     run(&cli, &mut app)
         .expect("running app");
@@ -77,10 +78,16 @@ fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
 
     while app.run {
         ui::set_query_editor_styles(app);
+
         term.draw(|f| ui::render_app(app, f))?;
 
         input::handle_events(app)?;
         app.update(cli)?;
+
+        if app.clear_screen {
+            term.clear()?;
+            app.clear_screen = false;
+        }
     }
 
     cleanup()?;
