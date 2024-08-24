@@ -4,7 +4,7 @@ use tui_textarea::TextArea;
 use crate::{
     cli::Cli,
     jq::{
-        self, JqJob
+        self, JqClient
     }
 };
 
@@ -19,7 +19,7 @@ pub struct App {
     /// The current working query
     pub query_editor: TextArea<'static>,
 
-    pub running_query: Option<JqJob>,
+    pub jq_client: JqClient,
 
     /// True while the app should be running.
     pub is_running: bool,
@@ -43,7 +43,7 @@ impl App {
             original,
             filtered: original.to_string(),
             query_editor: TextArea::default(),
-            running_query: None,
+            jq_client: JqClient::new(),
             is_running: true,
             error: None,
             clear_screen: false,
@@ -61,7 +61,7 @@ impl App {
     pub fn update(&mut self, _cli: &Cli) -> Result<()> {
 
         // check if the job is done running
-        if let Some(output) = JqJob::extract_output_once_done(&mut self.running_query) {
+        if let Some(output) = self.jq_client.try_recv_output() {
 
             match output {
                  jq::JqOutput::Success { json_content } => {
@@ -86,9 +86,18 @@ impl App {
     }
 
     /// Called when the user presses enter. Runs the query again
-    pub fn submit_message(&mut self) {
+    pub fn submit_query(&mut self) {
         log::info!("submitting query to jq");
-        let job = JqJob::new(self.original, self.query_content().to_string());
-        self.running_query = Some(job);
+        let query_content = self.query_content().to_string();
+        self.jq_client.submit_query(self.original, query_content)
+    }
+
+    /// Called when the user scrolls the text area
+    pub fn scroll_up(&mut self) {
+        log::info!("TODO: scroll up");
+    }
+    /// Called when the user scrolls the text area
+    pub fn scroll_down(&mut self) {
+        log::info!("TODO: scroll down");
     }
 }

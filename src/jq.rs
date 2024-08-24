@@ -14,6 +14,30 @@ use subprocess::{
 const JQ_EXE_NAME: &str = "jq";
 
 #[derive(Debug)]
+pub struct JqClient {
+    maybe_job: Option<JqJob>
+}
+impl JqClient {
+    pub fn new() -> Self {
+        Self {
+            maybe_job: None
+        }
+    }
+    /// Submits a new query, overwriting any previous job that we might have had 
+    pub fn submit_query(&mut self, source: &'static str, query: String) {
+        self.maybe_job = Some(JqJob::new(source, query));
+    }
+    /// Returns the output of the last ran job, if it has completed. Otherwise, `None`.
+    pub fn try_recv_output(&mut self) -> Option<JqOutput> {
+        let Some(job) = &self.maybe_job else { return None; };
+        let Some(output) = job.output() else { return None; };
+
+        self.maybe_job = None;
+        Some(output)
+    }
+}
+
+#[derive(Debug)]
 pub struct JqJob {
     rx: Receiver<JqOutput>
 }
@@ -55,25 +79,21 @@ impl JqJob {
         }
 
     }
-    pub fn extract_output_once_done(maybe_job: &mut Option<JqJob>) -> Option<JqOutput> {
-        let Some(job) = maybe_job else { return None; };
-        let Some(output) = job.output() else { return None; };
-
-        *maybe_job = None;
-        Some(output)
-    }
 }
 
 #[derive(Debug)]
 pub enum JqOutput {
+    /// Jq ran successfully and we have some new content to show the user.
     Success {
         json_content: String
     },
+    /// Jq failed and we have to report that to the user.
     Failure {
         title: String,
         failure: String,
     },
 }
+
 fn apply_filter(source: &'static str, query: String) -> Result<JqOutput> {
     let mut process = Popen::create(
         &[JQ_EXE_NAME, query.as_str()],
@@ -92,8 +112,6 @@ fn apply_filter(source: &'static str, query: String) -> Result<JqOutput> {
 
     let stdout = stdout.unwrap_or(format!("<missing stdout>"));
     let stderr = stderr.unwrap_or(format!("<missing stderr>"));
-
-    log::info!("jq stdout = {}", stdout.replace("\n", "\\n"));
 
     // translate the shell program's output
     let output = match exit_status {

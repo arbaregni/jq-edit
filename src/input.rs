@@ -31,9 +31,17 @@ pub fn handle_events(app: &mut App) -> Result<()> {
         // Submit a new query on "enter"
         Event::Key(KeyEvent { kind, code: KeyCode::Enter, .. }) => {
             if kind == KeyEventKind::Press {
-                app.submit_message();
+                app.submit_query();
             }
         },
+        Event::Key(KeyEvent { code: KeyCode::Up, .. }) => {
+            // Scrolling the text area up
+            app.scroll_up();
+        }
+        Event::Key(KeyEvent { code: KeyCode::Up, .. }) => {
+            // Scrolling the text area up
+            app.scroll_down();
+        }
         Event::Key(KeyEvent { code: KeyCode::Tab | KeyCode::BackTab, .. }) => {
             // nothing to do, just need to intercept this from text area edit
         }
