@@ -92,12 +92,15 @@ fn main() -> Result<()> {
     // just leak the string now and let the OS deal with it
     let source = source.leak();
 
-    let mut app = crate::app::App::init(source);
+    let mut app = crate::app::App::init(&cli, source);
+
+    // submit the query once to jq; this will provide the formatting and colorization
+    app.submit_query();
 
     run(&cli, &mut app)
         .expect("running app");
 
-    if cli.print_run_log_file {
+    if cli.print_log_file_path {
         println!("LOG_FILE: {}", log_file);
     }
 

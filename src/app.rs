@@ -31,6 +31,9 @@ pub struct App {
 
     /// Seems that after an interaction with jq, we should clear the screen and force a redraw
     pub clear_screen: bool,
+
+    /// Whether to colorize the filtered query
+    pub colorize: bool,
 }
 
 #[derive(Debug)]
@@ -40,7 +43,7 @@ pub struct ErrorPanel {
 }
 
 impl App {
-    pub fn init(original: &'static str) -> App {
+    pub fn init(cli: &Cli, original: &'static str) -> App {
         App {
             original,
             scroll_text: ScrollText::from(original.to_string()),
@@ -50,6 +53,7 @@ impl App {
             is_running: true,
             error: None,
             clear_screen: false,
+            colorize: cli.colorize,
         }
     }
 
@@ -99,8 +103,12 @@ impl App {
         // todo: do we need this?
         self.filtered = content.clone();
 
-        let tokens = tokens::tokenize(content.as_str());
-        self.scroll_text = ScrollText::from_tokens(tokens.as_slice());
+        if self.colorize {
+            let tokens = tokens::tokenize(content.as_str());
+            self.scroll_text = ScrollText::from_tokens(tokens.as_slice());
+        } else {
+            self.scroll_text = ScrollText::from_content(content);
+        }
     }
 
     /// Called when the user scrolls the text area
