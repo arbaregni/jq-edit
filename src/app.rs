@@ -95,6 +95,7 @@ impl App {
 
     /// Called when the user presses enter. Runs the query again
     pub fn submit_message(&mut self) {
+        log::info!("submitting message");
         self.query_changed = true;
     }
 }

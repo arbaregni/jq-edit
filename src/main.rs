@@ -44,18 +44,18 @@ fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<()> {
 
     // create the newest log run
     let now = chrono::Utc::now();
-    let filename = format!("run-{}.log", now.format("%Y-%m-%d-%H-%M-%S"));
+    let filename = format!("run-{}.log", now.format("%Y-%m-%dT%H:%M:%SZ"));
     let filepath = log_folder.join(filename);
 
     let log_file = fern::log_file(filepath)
         .with_context(|| format!("creating new log in {}", log_folder.display()))?;
 
     fern::Dispatch::new()
-        .format(|out, message, record| {
+        .format(move |out, message, record| {
             let now = chrono::Utc::now();
             out.finish(format_args!(
-                "{} [{}] {} {}",
-                now.format("%Y-%m-%dT%H:%M:%S"),
+                "  {} [{}]  {} > {}",
+                now.format("%Y-%m-%dT%H:%M:%SZ"),
                 record.level(),
                 record.target(),
                 message
@@ -101,7 +101,10 @@ fn main() -> Result<()> {
 
 fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
     // Set up the terminal for rendering
+    log::info!("enabling raw terminal mode");
     enable_raw_mode()?;
+
+    log::info!("entering alternate screen");
     io::stdout().execute(EnterAlternateScreen)?;
 
     // Restore the terminal on program failure
@@ -118,6 +121,8 @@ fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
 
     let backend = CrosstermBackend::new(io::stdout());
     let mut term = Terminal::new(backend)?;
+
+    log::info!("entering app loop");
 
     while app.run {
         ui::set_query_editor_styles(app);
@@ -139,6 +144,7 @@ fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
 }
 
 fn cleanup() -> Result<()> {
+    log::info!("cleaning up");
     disable_raw_mode()?;
     io::stdout().execute(LeaveAlternateScreen)?;
     Ok(())

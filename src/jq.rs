@@ -22,6 +22,7 @@ impl JqJob {
     pub fn new(_cli: &Cli, source: &'static str, query: String) -> JqJob {
         let (tx, rx) = channel();
         thread::spawn(move || {
+            log::info!("spawning jq worker thread");
             let result = apply_filter(source, query);
             let out = match result {
                 Ok(out) => out,
@@ -33,7 +34,12 @@ impl JqJob {
                     }
                 }
             };
-            tx.send(out);
+            match tx.send(out) {
+                Ok(_) => {},
+                Err(e) => {
+                    log::error!("could not send jq output: {e}");
+                }
+            }
         });
         JqJob { rx }
     }
@@ -86,8 +92,6 @@ fn apply_filter(source: &'static str, query: String) -> Result<JqOutput> {
 
     let stdout = stdout.unwrap_or(format!("<missing stdout>"));
     let stderr = stderr.unwrap_or(format!("<missing stderr>"));
-
-    log::info!("stdout = {stdout}, stderr = {stderr}");
 
     // translate the shell program's output
     let output = match exit_status {
