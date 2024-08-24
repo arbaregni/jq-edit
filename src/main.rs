@@ -35,16 +35,15 @@ fn read_stdin() -> Result<String> {
 
 
 fn main() {
-    pretty_env_logger::formatted_timed_builder()
-        .filter(None, log::LevelFilter::Info)
-        .init();
-
     let cli = cli::Cli::parse();
+
+
+    pretty_env_logger::formatted_timed_builder()
+        .filter(None, cli.level_filter)
+        .init();
 
     log::info!("reading from stdin");
     let source = read_stdin().unwrap();
-
-    log::info!("read: {source}");
 
     let mut app = crate::app::App::init(source);
 
