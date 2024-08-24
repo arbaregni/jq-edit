@@ -19,7 +19,7 @@ pub struct JqJob {
 }
 
 impl JqJob {
-    pub fn new(_cli: &Cli, source: &'static str, query: String) -> JqJob {
+    pub fn new(source: &'static str, query: String) -> JqJob {
         let (tx, rx) = channel();
         thread::spawn(move || {
             log::info!("spawning jq worker thread");
@@ -93,6 +93,8 @@ fn apply_filter(source: &'static str, query: String) -> Result<JqOutput> {
     let stdout = stdout.unwrap_or(format!("<missing stdout>"));
     let stderr = stderr.unwrap_or(format!("<missing stderr>"));
 
+    log::info!("jq stdout = {}", stdout.replace("\n", "\\n"));
+
     // translate the shell program's output
     let output = match exit_status {
         ExitStatus::Exited(rc) => match rc {
@@ -100,7 +102,7 @@ fn apply_filter(source: &'static str, query: String) -> Result<JqOutput> {
                 json_content: stdout
             },
             _ => JqOutput::Failure {
-                title: format!("jq subprocess exittied with exit code {rc}"),
+                title: format!("jq subprocess exited with exit code {rc}"),
                 failure: stderr,
             }
         },

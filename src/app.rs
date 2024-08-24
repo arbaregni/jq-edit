@@ -19,13 +19,10 @@ pub struct App {
     /// The current working query
     pub query_editor: TextArea<'static>,
 
-    /// True if the query buf has changed since last update
-    pub query_changed: bool,
-
     pub running_query: Option<JqJob>,
 
     /// True while the app should be running.
-    pub run: bool,
+    pub is_running: bool,
     
     /// Present if there is some error message to display
     pub error: Option<ErrorPanel>,
@@ -46,38 +43,35 @@ impl App {
             original,
             filtered: original.to_string(),
             query_editor: TextArea::default(),
-            query_changed: true,
             running_query: None,
-            run: true,
+            is_running: true,
             error: None,
             clear_screen: false,
         }
+    }
+
+    pub fn filtered_content(&self) -> &str {
+        self.filtered.as_str()
     }
 
     pub fn query_content(&self) -> &str {
         self.query_editor.lines()[0].as_str()
     }
 
-    pub fn update(&mut self, cli: &Cli) -> Result<()> {
-        // update the filters
+    pub fn update(&mut self, _cli: &Cli) -> Result<()> {
 
-        if self.query_changed || cli.refresh_jq_every_frame {
-            // TODO: cancel the currently running query if there is one
-
-            let job = JqJob::new(cli, self.original, self.query_content().to_string());
-            self.running_query = Some(job);
-
-        }
-
+        // check if the job is done running
         if let Some(output) = JqJob::extract_output_once_done(&mut self.running_query) {
 
             match output {
                  jq::JqOutput::Success { json_content } => {
+                     log::info!("received a successful response from jq, changing our filtered content now");
                      self.filtered = json_content;
                      self.error = None;
                  }
                  jq::JqOutput::Failure { title, failure } => {
                      // do NOT overwrite previous content on a fail, just show last good state
+                     log::info!("received an error from jq");
                      self.error = Some(ErrorPanel {
                          title,
                          failure
@@ -85,9 +79,7 @@ impl App {
                  }
              }
 
-            self.query_changed = false;
             self.clear_screen = true;
-
         }
 
         Ok(())
@@ -95,7 +87,8 @@ impl App {
 
     /// Called when the user presses enter. Runs the query again
     pub fn submit_message(&mut self) {
-        log::info!("submitting message");
-        self.query_changed = true;
+        log::info!("submitting query to jq");
+        let job = JqJob::new(self.original, self.query_content().to_string());
+        self.running_query = Some(job);
     }
 }

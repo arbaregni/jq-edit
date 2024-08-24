@@ -32,7 +32,7 @@ const LOG_FOLDER_NAME: &str = "logs";
 /// How many old runs to keep in the log folder
 const MAX_LOG_RUNS_SAVED: usize = 20;
 
-fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<()> {
+fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<String> {
     // ~/.cache/jq-edit
     let log_folder = project_dirs.cache_dir().to_path_buf().join(LOG_FOLDER_NAME);
 
@@ -46,6 +46,8 @@ fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<()> {
     let now = chrono::Utc::now();
     let filename = format!("run-{}.log", now.format("%Y-%m-%dT%H:%M:%SZ"));
     let filepath = log_folder.join(filename);
+
+    let log_filename = format!("{}", filepath.display());
 
     let log_file = fern::log_file(filepath)
         .with_context(|| format!("creating new log in {}", log_folder.display()))?;
@@ -65,7 +67,7 @@ fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<()> {
         .chain(log_file)
         .apply()?;
 
-    Ok(())
+    Ok(log_filename)
 }
 
 fn read_stdin() -> Result<String> {
@@ -80,7 +82,7 @@ fn main() -> Result<()> {
 
     let project_dirs = ProjectDirs::from("", "arbaregni", "jq-edit").expect("initialize project directories");
 
-    configure_logging(&cli, &project_dirs)?;
+    let log_file = configure_logging(&cli, &project_dirs)?;
 
     log::info!("reading from stdin");
     let source = read_stdin().unwrap();
@@ -93,6 +95,14 @@ fn main() -> Result<()> {
 
     run(&cli, &mut app)
         .expect("running app");
+
+    if cli.print_run_log_file {
+        println!("LOG_FILE: {}", log_file);
+    }
+
+    if cli.print_filtered_content {
+        println!("{}", app.filtered_content());
+    }
 
     println!("QUERY: {}", app.query_content());
 
@@ -124,7 +134,7 @@ fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
 
     log::info!("entering app loop");
 
-    while app.run {
+    while app.is_running {
         ui::set_query_editor_styles(app);
 
         term.draw(|f| ui::render_app(app, f))?;

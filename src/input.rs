@@ -25,7 +25,7 @@ pub fn handle_events(app: &mut App) -> Result<()> {
         // Quite the app on `Esc`
         Event::Key(KeyEvent { kind, code: KeyCode::Esc, .. }) => {
             if kind == KeyEventKind::Press {
-                app.run = false;
+                app.is_running = false;
             }
         }
         // Submit a new query on "enter"
