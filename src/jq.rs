@@ -1,8 +1,7 @@
-
-use crate::cli::Cli;
-
 use std::sync::mpsc::{
-    channel, Receiver, Sender, TryRecvError
+    channel, 
+    Receiver,
+    TryRecvError
 };
 use std::thread;
 

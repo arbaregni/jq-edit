@@ -19,6 +19,9 @@ pub struct Cli {
     /// Supply this flag to colorize the json output
     pub colorize: bool,
 
+    #[arg(long)]
+    /// Testing flag, supply it to use the homegrown json parsing solution rather than delagating to JQ
+    pub self_parse_json: bool,
 }
 
 fn parse_bool(s: &str) -> Result<bool, &'static str> {

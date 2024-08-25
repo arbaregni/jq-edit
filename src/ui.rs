@@ -1,12 +1,34 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect}, style::{
-        Color, Modifier, Style
-    }, terminal::Frame, text::{Line, Span, Text}, widgets::{Block, Borders, Padding, Paragraph}
+    layout::{
+        Constraint,
+        Direction,
+        Layout,
+        Rect
+    },
+    style::{
+        Color,
+        Modifier,
+        Style
+    }, 
+    terminal::Frame, 
+    text::Span,
+    widgets::{
+        Block,
+        Borders,
+        Padding,
+        Paragraph
+    }
 };
 
 use crate::{
-    app::{App, ErrorPanel},
-    tokens::{Token, TokenType}, scroll_text::ScrollText,
+    app::{
+        App,
+        ErrorPanel
+    },
+    tokens::{
+        Token,
+        TokenType
+    }
 };
 
 
@@ -100,6 +122,7 @@ pub fn token_to_span<'a>(tok: &Token<'a>) -> Span<'static> {
         TokenType::Number => Style::default().fg(Color::Blue),
         TokenType::Boolean => Style::default().fg(Color::Yellow),
         TokenType::InvalidChar => Style::default().fg(Color::White).bg(Color::Red),
+        TokenType::Eof => Style::default(),
     };
     Span::styled(tok.lex.to_string(), style)
 }

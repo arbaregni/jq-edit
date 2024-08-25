@@ -1,4 +1,3 @@
-use ratatui::text::Text;
 use regex::Regex;
 use once_cell::sync::Lazy;
 
@@ -36,8 +35,9 @@ pub enum TokenType {
     Number,
     Boolean,
     InvalidChar,
+    Eof,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Token<'a> {
     pub tty: TokenType,
     pub lex: &'a str,
@@ -56,6 +56,16 @@ impl <'a> TokenizeContext<'a> {
     }
 }
 
+impl TokenType {
+    pub fn is_whitespace(self) -> bool {
+        match self {
+            TokenType::Whitespace | TokenType::Newline => true,
+            _ => false,
+        }
+
+    }
+}
+
 pub fn tokenize(source: &str) -> Vec<Token> {
     let mut ctx = TokenizeContext::from(source);
     while ctx.source.len() > 0 {
@@ -63,7 +73,7 @@ pub fn tokenize(source: &str) -> Vec<Token> {
         let tok = PATTERN_TOKENS
             .iter()
             .find_map(|(tty, re)| {
-                println!("running {re:?}.find({:?})", ctx.source);
+                log::debug!("running {re:?}.find({:?})", ctx.source);
                 re.find(ctx.source)
                     .map(|capt| Token {
                         tty: tty.clone(),

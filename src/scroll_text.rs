@@ -1,8 +1,22 @@
 use ratatui::{
-    buffer::Buffer, layout::Rect, style::Style, text::Line, widgets::{block::BlockExt, Block, Widget}
+    buffer::Buffer,
+    layout::Rect,
+    style::Style,
+    text::Line,
+    widgets::{
+        block::BlockExt,
+        Block,
+        Widget
+    }
 };
 
-use crate::{tokens::{self, Token, TokenType}, ui};
+use crate::{
+    tokens::{
+        Token,
+        TokenType,
+    },
+    ui
+};
 
 #[derive(Debug)]
 pub struct ScrollText<'a> {
@@ -110,10 +124,6 @@ impl <'a, 'b> Widget for ScrollTextRef<'a, 'b> {
     }
 }
 impl <'a, 'b> ScrollTextRef<'a, 'b> {
-    pub fn style(mut self, style: Style) -> Self {
-        self.style = style;
-        self
-    }
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
         self

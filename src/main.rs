@@ -9,10 +9,12 @@ mod scroll_text;
 mod tokens;
 
 use std::{
-    fs::{self, File}, io::{
+    fs::{self},
+    io::{
         self,
         Read,
-    }, panic, time::SystemTime
+    },
+    panic
 };
 
 use anyhow::{Context, Result};
@@ -96,6 +98,12 @@ fn main() -> Result<()> {
 
     // submit the query once to jq; this will provide the formatting and colorization
     app.submit_query();
+    
+    // for testing purposes, if we self parse the json, do so now
+    if cli.self_parse_json {
+        let json_data = json::loads(source);
+        println!("{json_data:?}");
+    }
 
     run(&cli, &mut app)
         .expect("running app");

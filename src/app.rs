@@ -1,5 +1,4 @@
 use anyhow::Result;
-use ratatui::widgets::Block;
 use tui_textarea::TextArea;
 
 use crate::{
