@@ -31,6 +31,11 @@ use ratatui::{
     prelude::*,
 };
 
+// formats a number as a human readable size
+fn format_size(size: usize) -> String {
+    humansize::format_size(size, humansize::DECIMAL)
+}
+
 const LOG_FOLDER_NAME: &str = "logs";
 /// How many old runs to keep in the log folder
 const MAX_LOG_RUNS_SAVED: usize = 20;
@@ -104,7 +109,7 @@ fn read_source(cli: &cli::Cli) -> Result<String> {
             // user has supplied a filepath to read from
             log::info!("reading input from {}", filepath.display());
             let mut f = File::open(filepath)
-                .with_context(|| format!("openning input file {}", filepath.display()))?;
+                .with_context(|| format!("opening input file {}", filepath.display()))?;
             f.read_to_string(&mut buf)?;
         },
         None => {
@@ -117,6 +122,8 @@ fn read_source(cli: &cli::Cli) -> Result<String> {
     Ok(buf)
 }
 
+// 16 kb = 16000 bytes
+pub const MAX_STRING_SIZE_TO_PRINT: usize = 16_000;
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
@@ -149,8 +156,15 @@ fn main() -> Result<()> {
         println!("LOG_FILE: {}", log_file);
     }
 
-    if cli.print_filtered_content {
+    if app.filtered_content().len() < MAX_STRING_SIZE_TO_PRINT {
+        println!("=============================================");
         println!("{}", app.filtered_content());
+        println!("=============================================");
+    } else {
+        println!("Filtered content is too big to print: {}. Max size is {}.",
+                 format_size(app.filtered_content().len()),
+                 format_size(MAX_STRING_SIZE_TO_PRINT)
+        );
     }
 
     println!("QUERY: {}", app.query_content());

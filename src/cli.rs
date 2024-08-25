@@ -9,10 +9,6 @@ pub struct Cli {
     /// Supply an optional parameter to read the input from a file, instead of stdin
     pub input_filename: Option<PathBuf>,
 
-    #[arg(short, long)]
-    /// Supply this flag to print the filtered content
-    pub print_filtered_content: bool,
-
     #[arg(long, default_value_t = log::LevelFilter::Info)]
     /// The level to log at.
     pub log_level: log::LevelFilter,
