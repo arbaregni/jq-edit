@@ -52,6 +52,29 @@ fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<Strin
 
     let log_filename = format!("{}", filepath.display());
 
+    // clean up the old files
+    let mut read_dir = fs::read_dir(&log_folder)
+        .with_context(|| format!("reading log folder at {}", log_folder.display()))?
+        .collect::<Result<Vec<_>, _>>()
+        .with_context(|| format!("reading log folder at {}", log_folder.display()))?;
+
+    read_dir.sort_by_key(|entry| {
+        entry.path()
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string()
+    });
+    read_dir.reverse();
+
+    let to_be_deleted = (MAX_LOG_RUNS_SAVED - 1)..read_dir.len();
+
+    for i in to_be_deleted {
+        let path = read_dir[i].path();
+        fs::remove_file(&path)
+            .with_context(|| format!("attempting to remove old log file"))?;
+    }
+
     let log_file = fern::log_file(filepath)
         .with_context(|| format!("creating new log in {}", log_folder.display()))?;
 
