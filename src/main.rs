@@ -9,7 +9,7 @@ mod scroll_text;
 mod tokens;
 
 use std::{
-    fs::{self},
+    fs::{self, File},
     io::{
         self,
         Read,
@@ -96,9 +96,24 @@ fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<Strin
     Ok(log_filename)
 }
 
-fn read_stdin() -> Result<String> {
+fn read_source(cli: &cli::Cli) -> Result<String> {
     let mut buf = String::new();
-    io::stdin().read_to_string(&mut buf)?;
+
+    match &cli.input_filename {
+        Some(filepath) => {
+            // user has supplied a filepath to read from
+            log::info!("reading input from {}", filepath.display());
+            let mut f = File::open(filepath)
+                .with_context(|| format!("openning input file {}", filepath.display()))?;
+            f.read_to_string(&mut buf)?;
+        },
+        None => {
+            // default to stdin
+            log::info!("reading from stdin");
+            io::stdin().read_to_string(&mut buf)?;
+        }
+    };
+
     Ok(buf)
 }
 
@@ -110,8 +125,7 @@ fn main() -> Result<()> {
 
     let log_file = configure_logging(&cli, &project_dirs)?;
 
-    log::info!("reading from stdin");
-    let source = read_stdin().unwrap();
+    let source = read_source(&cli)?;
 
     // since it's just going to be around for the entire life of the program,
     // just leak the string now and let the OS deal with it

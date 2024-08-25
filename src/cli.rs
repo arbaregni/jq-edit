@@ -1,8 +1,14 @@
+use std::path::PathBuf;
+
 use clap::{ArgAction, Parser};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Cli {
+    #[arg(short = 'f', long)]
+    /// Supply an optional parameter to read the input from a file, instead of stdin
+    pub input_filename: Option<PathBuf>,
+
     #[arg(short, long)]
     /// Supply this flag to print the filtered content
     pub print_filtered_content: bool,
