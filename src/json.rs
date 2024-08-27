@@ -12,16 +12,15 @@ pub struct JsonData<'a>(JsonDataInner<'a>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonDataInner<'a> {
     ty: JsonDataType<'a>,
-    lex: Cow<'a, str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JsonDataType<'a> {
     Object { entries: Vec<(JsonKey<'a>, JsonData<'a>)> },
     Array { elems: Vec<JsonData<'a>> },
-    Str,
-    Boolean,
-    Number,
+    Str { lex: Cow<'a, str> },
+    Boolean { lex: Cow<'a, str> },
+    Number { lex: Cow<'a, str> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,6 +56,7 @@ impl <'a> ParsingContext<'a> {
     fn eat_whitespace(&mut self) {
         // we can ignore white space while parsing
         while self.peek().tty.is_whitespace() {
+            log::trace!("consumed: {:?}", self.peek());
             self.idx += 1;
         }
     }
@@ -66,19 +66,22 @@ impl <'a> ParsingContext<'a> {
         if tok.tty != tty {
             bail!("Expected {tty:?}, got {:?}", self.peek().tty);
         }
+        log::trace!("consumed: {:?}", self.peek());
         self.idx += 1;
         Ok(tok)
     }
     fn parse_json(&mut self) -> Result<JsonData<'a>> {
         self.eat_whitespace();
 
+        log::debug!("begin parsing json");
+
         let tty = self.peek().tty;
         let json = match tty {
             TokenType::OpenBrace => self.parse_object()?,
             TokenType::OpenBracket => self.parse_array()?,
             TokenType::String => self.parse_string()?,
-            TokenType::Number => self.parse_single_token_as(JsonDataType::Number)?,
-            TokenType::Boolean => self.parse_single_token_as(JsonDataType::Boolean)?,
+            TokenType::Number => self.parse_number()?,
+            TokenType::Boolean => self.parse_boolean()?,
             _ => { 
                 bail!("unexpected token type {tty:?}");
             }
@@ -88,6 +91,8 @@ impl <'a> ParsingContext<'a> {
     fn parse_object(&mut self) -> Result<JsonData<'a>> {
         self.consume(TokenType::OpenBrace)?;
 
+        log::debug!("begin parsing object");
+
         let mut entries = Vec::new();
 
         loop {
@@ -95,12 +100,15 @@ impl <'a> ParsingContext<'a> {
             let _ = self.consume(TokenType::Colon)?;
             let value = self.parse_json()?;
 
-            let key = JsonKey {
-                lex: key.0.lex
+            let JsonDataType::Str { lex } = key.0.ty else {
+                panic!("self.parse_string() should return a JsonDataType::Str");
             };
+
+            let key = JsonKey { lex };
 
             entries.push((key, value));
 
+            self.eat_whitespace();
             match self.peek().tty {
                 TokenType::Comma => {
                     self.consume(TokenType::Comma)?;
@@ -120,12 +128,13 @@ impl <'a> ParsingContext<'a> {
             ty: JsonDataType::Object {
                 entries
             },
-            lex: Cow::from("<todo>"),
         }))
 
     }
     fn parse_array(&mut self) -> Result<JsonData<'a>> {
         self.consume(TokenType::OpenBracket)?;
+
+        log::debug!("begin parsing array");
 
         let mut elems = Vec::new();
 
@@ -159,29 +168,48 @@ impl <'a> ParsingContext<'a> {
             ty: JsonDataType::Array {
                 elems
             },
-            lex: Cow::from("todo"),
        }))
     }
     fn parse_string(&mut self) -> Result<JsonData<'a>> {
         self.eat_whitespace();
 
+        log::debug!("begin parsing string");
+
         let tok = self.consume(TokenType::String)?;
         let lex = Cow::Borrowed(tok.lex);
         Ok(JsonData(JsonDataInner {
-            ty: JsonDataType::Str,
-            lex
+            ty: JsonDataType::Str {
+                lex
+            }
         }))
     }
-    fn parse_single_token_as(&mut self, ty: JsonDataType<'a>) -> Result<JsonData<'a>> {
+    fn parse_number(&mut self) -> Result<JsonData<'a>> {
         self.eat_whitespace();
 
-        let tok = self.peek();
+        log::debug!("begin parsing number");
+
+        let tok = self.consume(TokenType::Number)?;
         let lex = Cow::Borrowed(tok.lex);
         Ok(JsonData(JsonDataInner {
-            ty,
-            lex
+            ty: JsonDataType::Number {
+                lex
+            }
         }))
     }
+    fn parse_boolean(&mut self) -> Result<JsonData<'a>> {
+        self.eat_whitespace();
+
+        log::debug!("begin parsing boolean");
+
+        let tok = self.consume(TokenType::Boolean)?;
+        let lex = Cow::Borrowed(tok.lex);
+        Ok(JsonData(JsonDataInner {
+            ty: JsonDataType::Boolean {
+                lex
+            }
+        }))
+    }
+
 }
 
 pub fn loads<'a>(source: &'a str) -> Result<JsonData<'a>> {
@@ -232,6 +260,97 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_eat_whitespace() {
+        let source = "blah";
+        let tokens = vec![
+            Token {
+                tty: TokenType::Whitespace,
+                lex: " \t",
+            },
+            Token {
+                tty: TokenType::Newline,
+                lex: "\n",
+            },
+            Token {
+                tty: TokenType::Whitespace,
+                lex: " ",
+            },
+            Token {
+                tty: TokenType::Number,
+                lex: "34",
+            }
+        ];
+        let mut ctx = ParsingContext::from(source, tokens);
+
+        assert_eq!(ctx.peek(), Token {
+            tty: TokenType::Whitespace,
+            lex: " \t",
+        });
+
+        ctx.eat_whitespace();
+
+        assert_eq!(ctx.peek(), Token {
+            tty: TokenType::Number,
+            lex: "34"
+        });
+    }   
+
+    #[test]
+    fn test_consume_when_matches() {
+        let source = "blah";
+        let tokens = vec![
+            Token {
+                tty: TokenType::Number,
+                lex: "34",
+            }
+        ];
+        let mut ctx = ParsingContext::from(source, tokens);
+
+        assert_eq!(ctx.peek(), Token {
+            tty: TokenType::Number,
+            lex: "34",
+        });
+
+        let tok = ctx.consume(TokenType::Number).expect("should find Number token");
+        assert_eq!(tok, Token {
+            tty: TokenType::Number,
+            lex: "34"
+        });
+
+        assert_eq!(ctx.peek(), Token {
+            tty: TokenType::Eof,
+            lex: "",
+        });
+
+    }
+
+    #[test]
+    fn test_consume_when_does_not_match() {
+        let source = "blah";
+        let tokens = vec![
+            Token {
+                tty: TokenType::Number,
+                lex: "34",
+            }
+        ];
+        let mut ctx = ParsingContext::from(source, tokens);
+
+        assert_eq!(ctx.peek(), Token {
+            tty: TokenType::Number,
+            lex: "34",
+        });
+
+        let result = ctx.consume(TokenType::String); 
+        assert!(result.is_err());
+
+        assert_eq!(ctx.peek(), Token {
+            tty: TokenType::Number,
+            lex: "34",
+        });
+    }
+
+
 }
 
 #[cfg(test)]
@@ -242,8 +361,9 @@ mod end_user_tests {
     fn parse_int() {
         let source = "  \t\n 34";
         let expected = JsonData(JsonDataInner {
-            ty: JsonDataType::Number,
-            lex: Cow::from("34")
+            ty: JsonDataType::Number { 
+                lex: Cow::from("34")
+            }
         });
 
         let actual = loads(source).expect("this should parse");
@@ -255,8 +375,9 @@ mod end_user_tests {
     fn parse_boolean() {
         let source = "true";
         let expected = JsonData(JsonDataInner {
-            ty: JsonDataType::Boolean,
-            lex: Cow::from("true")
+            ty: JsonDataType::Boolean { 
+                lex: Cow::from("true")
+            }
         });
 
         let actual = loads(source).expect("this should parse");
@@ -268,8 +389,9 @@ mod end_user_tests {
     fn parse_string() {
         let source = " \"hello world\" ";
         let expected = JsonData(JsonDataInner {
-            ty: JsonDataType::Str,
-            lex: Cow::from("\"hello world\"")
+            ty: JsonDataType::Str { 
+                lex: Cow::from("\"hello world\"")
+            }
         });
 
         let actual = loads(source).expect("this should parse");
@@ -284,20 +406,22 @@ mod end_user_tests {
             ty: JsonDataType::Array {
                 elems: vec![
                     JsonData(JsonDataInner {
-                        ty: JsonDataType::Number,
-                        lex: Cow::from("34"),
+                        ty: JsonDataType::Number { 
+                            lex: Cow::from("34"),
+                        }
                     }),
                     JsonData(JsonDataInner {
-                        ty: JsonDataType::Boolean,
-                        lex: Cow::from("true"),
+                        ty: JsonDataType::Boolean { 
+                            lex: Cow::from("true"),
+                        }
                     }),
                     JsonData(JsonDataInner {
-                        ty: JsonDataType::Str,
-                        lex: Cow::from("\"hello world\""),
+                        ty: JsonDataType::Str { 
+                            lex: Cow::from("\"hello world\""),
+                        }
                     }),
                 ],
             },
-            lex: Cow::from(source)
         });
 
         let actual = loads(source).expect("this should parse");
@@ -314,19 +438,81 @@ mod end_user_tests {
                     (
                         JsonKey { lex: Cow::from("\"foo\"") },
                         JsonData(JsonDataInner {
-                            ty: JsonDataType::Str,
-                            lex: Cow::from("\"bar\"")
+                            ty: JsonDataType::Str { 
+                                lex: Cow::from("\"bar\"")
+                            }
                         })
                     )
                 ]
             },
-            lex: Cow::from(source)
         });
          
         let actual = loads(source).expect("this should parse");
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn parse_object_nested() {
+        let source = "{ \"foo\": [34, true, \"hello world\", { \"a\" : \"b\", \"c\": \"d\" } ] }";
+        let expected = JsonData(JsonDataInner {
+            ty: JsonDataType::Object {
+                entries: vec![
+                    (
+                        JsonKey { lex: Cow::from("\"foo\"") },
+                        JsonData(JsonDataInner {
+                            ty: JsonDataType::Array {
+                                elems: vec![
+                                    JsonData(JsonDataInner {
+                                        ty: JsonDataType::Number {
+                                            lex: Cow::from("34")
+                                        },
+                                    }),
+                                    JsonData(JsonDataInner {
+                                        ty: JsonDataType::Boolean {
+                                            lex: Cow::from("true")
+                                        },
+                                    }),
+                                    JsonData(JsonDataInner {
+                                        ty: JsonDataType::Str {
+                                            lex: Cow::from("\"hello world\"")
+                                        },
+                                    }),
+                                    JsonData(JsonDataInner {
+                                        ty: JsonDataType::Object {
+                                            entries: vec![
+                                                (
+                                                    JsonKey { lex: Cow::from("\"a\"") },
+                                                    JsonData(JsonDataInner {
+                                                        ty: JsonDataType::Str {
+                                                            lex: Cow::from("\"b\"")
+                                                        },
+                                                    }),
+                                                ),
+                                                (
+                                                    JsonKey { lex: Cow::from("\"c\"") },
+                                                    JsonData(JsonDataInner {
+                                                        ty: JsonDataType::Str {
+                                                            lex: Cow::from("\"d\"")
+                                                        },
+                                                    }),
+                                                )
+                                            ]
+                                        },
+                                    })
+                                ]
+                            }
+                        })
+                    )
+                ]
+            },
+        });
+         
+        let actual = loads(source).expect("this should parse");
+
+        assert_eq!(actual, expected);
+    }
+
 
 }
 
