@@ -11,7 +11,8 @@ static PATTERN_TOKENS: Lazy<Vec<(TokenType, Regex)>> = Lazy::new(|| {
         (TokenType::Colon, Regex::new(r"^:").expect("compile regex")),
         (TokenType::Newline, Regex::new(r"^\r?\n").expect("compile regex")),
         (TokenType::Whitespace, Regex::new(r"^[ \t]+").expect("compile regex")),
-        (TokenType::Boolean, Regex::new(r"^true|false").expect("compile regex")),
+        (TokenType::Boolean, Regex::new(r"^true").expect("compile regex")),
+        (TokenType::Boolean, Regex::new(r"^false").expect("compile regex")),
         (TokenType::String, Regex::new(r#"^"(?:[^"\\]|\\.)*""#).expect("compile regex")),
         // Splitting up the numbers into 3 patterns for clarity
         (TokenType::Number, Regex::new(r"^-?\d*\.\d+").expect("compile regex")),
@@ -266,4 +267,51 @@ mod tests {
             lex: "p"
         })
     }
+
+    #[test]
+    fn tokenize_boolean_true() {
+        let source = "true";
+        let tokens = tokenize(source);
+
+        assert_eq!(tokens.len(), 1,
+            "number of tokens did not match, tokens = {:?}", tokens
+        );
+        assert_eq!(&tokens[0], &Token {
+            tty: TokenType::Boolean,
+            lex: "true"
+        })
+    }
+
+    #[test]
+    fn tokenize_boolean_false() {
+        let source = "false";
+        let tokens = tokenize(source);
+
+        assert_eq!(tokens.len(), 1,
+            "number of tokens did not match, tokens = {:?}", tokens
+        );
+        assert_eq!(&tokens[0], &Token {
+            tty: TokenType::Boolean,
+            lex: "false"
+        })
+    }
+
+    #[test]
+    fn tokenize_boolean_false2() {
+        let source = "\"hello world\"false";
+        let tokens = tokenize(source);
+
+        assert_eq!(tokens.len(), 2,
+            "number of tokens did not match, tokens = {:?}", tokens
+        );
+        assert_eq!(&tokens[0], &Token {
+            tty: TokenType::String,
+            lex: "\"hello world\""
+        });
+        assert_eq!(&tokens[1], &Token {
+            tty: TokenType::Boolean,
+            lex: "false"
+        })
+    }
+
 }
