@@ -116,6 +116,7 @@ fn read_source(cli: &cli::Cli) -> Result<String> {
             // default to stdin
             log::info!("reading from stdin");
             io::stdin().read_to_string(&mut buf)?;
+            log::info!("read {} bytes from stdin", buf.len());
         }
     };
 

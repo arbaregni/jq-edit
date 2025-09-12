@@ -1,5 +1,5 @@
 use anyhow::Result;
-use tui_textarea::TextArea;
+use tui_textarea::{CursorMove, TextArea};
 
 use crate::{
     cli::Cli, jq::{
@@ -43,11 +43,16 @@ pub struct ErrorPanel {
 
 impl App {
     pub fn init(cli: &Cli, original: &'static str) -> App {
+        let initial_query = cli.query.clone().unwrap_or(String::new());
+
+        let mut query_editor = TextArea::from(vec![initial_query]);
+        query_editor.move_cursor(CursorMove::End);
+
         App {
             original,
             scroll_text: ScrollText::from(original.to_string()),
             filtered: original.to_string(),
-            query_editor: TextArea::default(),
+            query_editor,
             jq_client: JqClient::new(),
             is_running: true,
             error: None,

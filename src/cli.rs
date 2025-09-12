@@ -5,6 +5,10 @@ use clap::{ArgAction, Parser};
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Cli {
+    #[arg()]
+    // Supply an optional parameter to start the query on
+    pub query: Option<String>,
+
     #[arg(short = 'f', long)]
     /// Supply an optional parameter to read the input from a file, instead of stdin
     pub input_filename: Option<PathBuf>,
