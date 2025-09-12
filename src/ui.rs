@@ -119,7 +119,8 @@ pub fn token_to_span<'a>(tok: &Token<'a>) -> Span<'static> {
             | TokenType::CloseBracket  | TokenType::Comma  | TokenType::Colon  
             | TokenType::Whitespace  | TokenType::Newline => Style::default(),
         TokenType::String => Style::default().fg(Color::Green),
-        TokenType::Number => Style::default().fg(Color::Blue),
+        TokenType::Key => Style::default().fg(Color::Blue),
+        TokenType::Number => Style::default().fg(Color::LightBlue),
         TokenType::Boolean => Style::default().fg(Color::Yellow),
         TokenType::InvalidChar => Style::default().fg(Color::White).bg(Color::Red),
         TokenType::Eof => Style::default(),
