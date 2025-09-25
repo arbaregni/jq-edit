@@ -2,7 +2,7 @@ use anyhow::Result;
 use tui_textarea::{CursorMove, TextArea};
 
 use crate::{
-    cli::Cli, jq::{
+    cli::Cli, jq_cli::{
         self, JqClient
     }, tokens, scroll_text::ScrollText
 };
@@ -75,12 +75,12 @@ impl App {
         if let Some(output) = self.jq_client.try_recv_output() {
 
             match output {
-                 jq::JqOutput::Success { json_content } => {
+                 jq_cli::JqOutput::Success { json_content } => {
                      log::info!("received a successful response from jq, changing our filtered content now");
                      self.error = None;
                      self.set_display_content(json_content);
                  }
-                 jq::JqOutput::Failure { title, failure } => {
+                 jq_cli::JqOutput::Failure { title, failure } => {
                      // do NOT overwrite previous content on a fail, just show last good state
                      log::info!("received an error from jq");
                      self.error = Some(ErrorPanel {

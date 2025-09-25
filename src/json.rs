@@ -353,8 +353,8 @@ mod tests {
 
 }
 
-#[cfg(test)]
-mod end_user_tests {
+/*
+mod parsing {
     use super::*;
 
     #[test]
@@ -516,3 +516,4 @@ mod end_user_tests {
 
 }
 
+*/

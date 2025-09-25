@@ -1,6 +1,6 @@
 mod json;
 mod cli;
-mod jq;
+mod jq_cli;
 mod ui;
 mod app;
 mod input;
