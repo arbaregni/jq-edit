@@ -25,7 +25,7 @@ use crate::{
         App,
         ErrorPanel
     },
-    tokens::{
+    json::tokens::{
         Token,
         TokenType
     }

@@ -1,24 +1,24 @@
 use regex::Regex;
 use once_cell::sync::Lazy;
 
-static PATTERN_TOKENS: Lazy<Vec<(TokenType, Regex)>> = Lazy::new(|| {
+pub static TOKEN_PATTERNS: Lazy<Vec<(TokenType, Regex)>> = Lazy::new(|| {
     vec![
-        (TokenType::OpenBrace, Regex::new(r"^\{").expect("compile regex")),
-        (TokenType::CloseBrace, Regex::new(r"^\}").expect("compile regex")),
-        (TokenType::OpenBracket, Regex::new(r"^\[").expect("compile regex")),
-        (TokenType::CloseBracket, Regex::new(r"^\]").expect("compile regex")),
-        (TokenType::Comma, Regex::new(r"^,").expect("compile regex")),
-        (TokenType::Colon, Regex::new(r"^:").expect("compile regex")),
-        (TokenType::Newline, Regex::new(r"^\r?\n").expect("compile regex")),
-        (TokenType::Whitespace, Regex::new(r"^[ \t]+").expect("compile regex")),
-        (TokenType::Boolean, Regex::new(r"^true").expect("compile regex")),
-        (TokenType::Boolean, Regex::new(r"^false").expect("compile regex")),
-        (TokenType::Key, Regex::new(r#"^"(?:[^"\\]|\\.)*":"#).expect("compile regex")),
-        (TokenType::String, Regex::new(r#"^"(?:[^"\\]|\\.)*""#).expect("compile regex")),
+        (TokenType::OpenBrace,      Regex::new(r"^\{").expect("compile regex")),
+        (TokenType::CloseBrace,     Regex::new(r"^\}").expect("compile regex")),
+        (TokenType::OpenBracket,    Regex::new(r"^\[").expect("compile regex")),
+        (TokenType::CloseBracket,   Regex::new(r"^\]").expect("compile regex")),
+        (TokenType::Comma,          Regex::new(r"^,").expect("compile regex")),
+        (TokenType::Colon,          Regex::new(r"^:").expect("compile regex")),
+        (TokenType::Newline,        Regex::new(r"^\r?\n").expect("compile regex")),
+        (TokenType::Whitespace,     Regex::new(r"^[ \t]+").expect("compile regex")),
+        (TokenType::Boolean,        Regex::new(r"^true").expect("compile regex")),
+        (TokenType::Boolean,        Regex::new(r"^false").expect("compile regex")),
+        (TokenType::Key,            Regex::new(r#"^"(?:[^"\\]|\\.)*":"#).expect("compile regex")),
+        (TokenType::String,         Regex::new(r#"^"(?:[^"\\]|\\.)*""#).expect("compile regex")),
         // Splitting up the numbers into 3 patterns for clarity
-        (TokenType::Number, Regex::new(r"^-?\d*\.\d+").expect("compile regex")),
-        (TokenType::Number, Regex::new(r"^-?\d+\.\d*").expect("compile regex")),
-        (TokenType::Number, Regex::new(r"^-?\d+").expect("compile regex")),
+        (TokenType::Number,         Regex::new(r"^-?\d*\.\d+").expect("compile regex")),
+        (TokenType::Number,         Regex::new(r"^-?\d+\.\d*").expect("compile regex")),
+        (TokenType::Number,         Regex::new(r"^-?\d+").expect("compile regex")),
     ]
 });
 
@@ -73,7 +73,7 @@ pub fn tokenize(source: &str) -> Vec<Token> {
     let mut ctx = TokenizeContext::from(source);
     while ctx.source.len() > 0 {
 
-        let tok = PATTERN_TOKENS
+        let tok = TOKEN_PATTERNS
             .iter()
             .find_map(|(tty, re)| {
                 log::debug!("running {re:?}.find({:?})", ctx.source);

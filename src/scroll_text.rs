@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 use crate::{
-    tokens::{
+    json::tokens::{
         Token,
         TokenType,
     },

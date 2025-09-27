@@ -4,7 +4,9 @@ use tui_textarea::{CursorMove, TextArea};
 use crate::{
     cli::Cli, jq_cli::{
         self, JqClient
-    }, tokens, scroll_text::ScrollText
+    }, 
+    json::tokens,
+    scroll_text::ScrollText
 };
 
 #[derive(Debug)]

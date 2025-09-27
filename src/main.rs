@@ -6,7 +6,6 @@ mod app;
 mod input;
 mod my_line_editor;
 mod scroll_text;
-mod tokens;
 
 use std::{
     fs::{self, File},
@@ -133,6 +132,25 @@ fn main() -> Result<()> {
 
     let log_file = configure_logging(&cli, &project_dirs)?;
 
+    if cli.test_streaming {
+        match cli.input_filename.as_ref() {
+            Some(input_filename) => {
+                let mut tokens = crate::json::streaming::stream_tokens(input_filename)?;
+                while let Some(tok) = tokens.try_next()? {
+                    println!("{tok:?}");
+                }
+            }
+            None => {
+                let br = buffered_reader::Generic::new(io::stdin(), None);
+                let mut tokens = crate::json::streaming::StreamingTokens::from(br);
+                while let Some(tok) = tokens.try_next()? {
+                    println!("{tok:?}");
+                }
+            }
+        }
+        return Ok(());
+    }
+
     let source = read_source(&cli)?;
 
     // since it's just going to be around for the entire life of the program,
@@ -146,8 +164,7 @@ fn main() -> Result<()> {
     
     // for testing purposes, if we self parse the json, do so now
     if cli.self_parse_json {
-        let json_data = json::loads(source);
-        println!("{json_data:?}");
+        todo!()
     }
 
     run(&cli, &mut app)

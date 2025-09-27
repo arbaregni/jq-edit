@@ -9,6 +9,9 @@ pub struct Cli {
     // Supply an optional parameter to start the query on
     pub query: Option<String>,
 
+    #[arg(long)]
+    pub test_streaming: bool,
+
     #[arg(short = 'f', long)]
     /// Supply an optional parameter to read the input from a file, instead of stdin
     pub input_filename: Option<PathBuf>,
