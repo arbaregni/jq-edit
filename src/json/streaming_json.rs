@@ -1,3 +1,4 @@
+use core::f64;
 use std::borrow::Cow;
 
 use anyhow::{bail, Result};
@@ -15,14 +16,18 @@ pub type JsonPair<'a> = (JsonPath<'a>, JsonData<'a>);
 
 pub struct StreamingJson<'a, T> {
     tokens: TokenStreamAdaptor<T>,
-    peek: Option<Token>,
     path: JsonPath<'a>,
     parents: Vec<JsonBegin>,
 }
 
 enum JsonBegin {
-    Object { start: Token },
-    Array { start: Token, index: usize },
+    Object { 
+        #[allow(dead_code)] start: Token
+    },
+    Array {
+        #[allow(dead_code)] start: Token,
+        index: usize
+    },
 }
 
 impl <'a, T> StreamingJson<'a, T> where T: Streaming<Item = Token> {
@@ -31,7 +36,6 @@ impl <'a, T> StreamingJson<'a, T> where T: Streaming<Item = Token> {
             tokens: TokenStreamAdaptor::from(tokens),
             path: JsonPath::empty(),
             parents: Vec::new(),
-            peek: None
         }
     }
 }
@@ -261,15 +265,18 @@ impl <'a, T> Streaming for StreamingJson<'a, T> where T: Streaming<Item = Token>
     }
 }
 fn tok_to_num(token: &Token) -> Result<JsonData<'static>> {
-    if token.lex.as_str().contains(".") {
-        let value = token.lex.as_str().parse()?;
-        Ok(JsonData::Float { value })
-    } else {
-        let value = token.lex.as_str().parse()?;
-        Ok(JsonData::Number { value })
-    }
-}
+    use IntOrFloat::*;
 
+    let value = match token.lex.as_str() {
+        "inf" => JsonData::Float { value: f64::INFINITY },
+        "-inf" => JsonData::Float { value: f64::NEG_INFINITY },
+        input => match parse_scientific_notation(input)? {
+            Int(value) => JsonData::Number { value },
+            Float(value) => JsonData::Float { value },
+        }
+    };
+    Ok(value)
+}
 
 fn tok_to_bool(token: &Token) -> Result<JsonData<'static>> {
     let value = token.lex.as_str().parse()?;
@@ -279,6 +286,48 @@ fn tok_to_str(token: &Token) -> Result<JsonData<'static>> {
     let value = enquote::unescape(&token.lex, None)?;
     let value = Cow::Owned(value); 
     Ok(JsonData::Str { value })
+}
+
+
+enum IntOrFloat {
+    Int(i64),
+    Float(f64)
+}
+fn parse_scientific_notation(input: &str) -> Result<IntOrFloat> {
+    let value = match input.split_once(&['e', 'E']) {
+        Some((mantissa, exponent)) => {
+            use IntOrFloat::*;
+
+            let mantissa = parse_maybe_decimal(mantissa)?;
+            let exponent: i32 = exponent.parse()?;
+            match mantissa {
+                Int(m) => {
+                    let exp: u32 = exponent.abs().try_into()?;
+                    if exponent >= 0 {
+                        Int(m * 10i64.pow(exp))
+                    } else if (m % 10i64.pow(exp)) == 0 {
+                        Int(m / 10i64.pow(exp))
+                    } else {
+                        Float(m as f64 * 10f64.powi(exponent))
+                    }
+                }
+                Float(m) => Float(m * 10f64.powi(exponent))
+            }
+        }
+        None => parse_maybe_decimal(input)?,
+    };
+    Ok(value)
+}
+
+fn parse_maybe_decimal(input: &str) -> Result<IntOrFloat> {
+    if input.contains(".") {
+        let value = input.parse()?;
+        Ok(IntOrFloat::Float(value))
+    } else {
+        let value = input.parse()?;
+        Ok(IntOrFloat::Int(value))
+    }
+
 }
 
 #[cfg(test)]
@@ -332,6 +381,10 @@ mod tests {
         test_float_simple "12.3" => json_float(12.3) ;
         test_float_leading_period ".3" => json_float(0.3) ;
         test_float_following_period "3." => json_float(3.0) ;
+
+        test_scientific "1e2" => json_int(100) ;
+        test_float_scientific "1.0e2" => json_float(100.0) ;
+        test_float_scientific_negative_exp "1.0e-2" => json_float(0.01) ;
     }
 
     #[test]

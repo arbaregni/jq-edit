@@ -9,7 +9,7 @@ pub type CookieType = ();
 
 const DATA_WINDOW: usize = 1024;
 
-pub const TOKEN_LITERALS: [(TokenType, &'static str); 13] = [
+pub const TOKEN_LITERALS: [(TokenType, &'static str); 15] = [
     (TokenType::OpenBrace,      "{"),
     (TokenType::CloseBrace,     "}"),
     (TokenType::OpenBracket,    "["),
@@ -22,6 +22,8 @@ pub const TOKEN_LITERALS: [(TokenType, &'static str); 13] = [
     (TokenType::Whitespace,     " "),
     (TokenType::Boolean,        "true"),
     (TokenType::Boolean,        "false"),
+    (TokenType::Number,         "inf"),
+    (TokenType::Boolean,        "-inf"),
     (TokenType::Null,           "null"),
 ];
 
@@ -80,23 +82,39 @@ impl <BR> StreamingTokens<BR> where BR: BufferedReader<CookieType> {
             Ok(None)
         }
     }
+    fn consume_if_char_matches<F: FnOnce(char) -> bool>(&mut self,  buf: &mut String, pred: F) -> Result<Option<char>> {
+        let Some(ch) = self.peek_char()? else {
+            return Ok(None);
+        };
+        if pred(ch) {
+            buf.push(ch);
+            self.advance(ch.len_utf8());
+            Ok(Some(ch))
+        } else {
+            Ok(None)
+        }
+    }
+
 
     fn consume_number(&mut self) -> Result<String> {
         let mut buf = String::with_capacity(10);
         let mut found_period = false;
 
-        if let Some(ch) = self.peek_if_char_matches(|ch| ch == '-')? {
-            buf.push(ch);
-            self.advance(ch.len_utf8());
-        }
+        self.consume_if_char_matches(&mut buf, |ch| ch == '-')?;
 
-        while let Some(ch) = self.peek_if_char_matches(|ch| ch.is_ascii_digit() || (!found_period && ch == '.'))? {
-            buf.push(ch);
-            self.advance(ch.len_utf8());
+        while let Some(ch) = self.consume_if_char_matches(&mut buf, |ch| ch.is_ascii_digit() || (!found_period && ch == '.'))? {
             if ch == '.' {
                 found_period = true;
             }
         }
+
+        if let Some(_) = self.consume_if_char_matches(&mut buf, |ch| ch == 'e' || ch == 'E')? {
+
+            self.consume_if_char_matches(&mut buf, |ch| ch == '+' || ch == '-')?;
+
+            while let Some(_) = self.consume_if_char_matches(&mut buf, |ch| ch.is_ascii_digit())? { }
+        }
+
 
         Ok(buf)
     }
@@ -108,9 +126,7 @@ impl <BR> StreamingTokens<BR> where BR: BufferedReader<CookieType> {
             bail!("bad start to string");
         }
 
-        while let Some(ch) = self.peek_if_char_matches(|ch| ch != '"')? {
-            buf.push(ch);
-            self.advance(ch.len_utf8());
+        while let Some(ch) = self.consume_if_char_matches(&mut buf, |ch| ch != '"')? {
 
             if ch == '\\' {
                 let Some(escaped_char) = self.peek_char()? else {
@@ -245,6 +261,21 @@ mod tests {
         assert_eq!(s.try_next().expect("succeed"), Some(Token { tty: TokenType::Number, lex: "-12.3".to_string() }));
         assert_eq!(s.try_next().expect("succeed"), None);
     }
+
+    #[test]
+    fn test_scientific1() {
+        let mut s = make_stream("4e10");
+        assert_eq!(s.try_next().expect("succeed"), Some(Token { tty: TokenType::Number, lex: "4e10".to_string() }));
+        assert_eq!(s.try_next().expect("succeed"), None);
+    }
+
+   #[test]
+    fn test_scientific_negative_exp() {
+        let mut s = make_stream("4e-10");
+        assert_eq!(s.try_next().expect("succeed"), Some(Token { tty: TokenType::Number, lex: "4e-10".to_string() }));
+        assert_eq!(s.try_next().expect("succeed"), None);
+    }
+
 
     #[test]
     fn test_string_simple() {
