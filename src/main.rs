@@ -1,4 +1,5 @@
 mod json;
+mod streaming;
 mod cli;
 mod jq_cli;
 mod ui;
@@ -20,6 +21,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 
 use directories::ProjectDirs;
+use streaming::Streaming;
+use json::{JsonData, JsonPath};
 use ratatui::{
     crossterm::{
         terminal::{
@@ -82,7 +85,7 @@ fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<Strin
     let log_file = fern::log_file(filepath)
         .with_context(|| format!("creating new log in {}", log_folder.display()))?;
 
-    fern::Dispatch::new()
+    let mut dispatch = fern::Dispatch::new()
         .format(move |out, message, record| {
             let now = chrono::Utc::now();
             out.finish(format_args!(
@@ -94,8 +97,13 @@ fn configure_logging(cli: &cli::Cli, project_dirs: &ProjectDirs) -> Result<Strin
             ))
         })
         .level(cli.log_level)
-        .chain(log_file)
-        .apply()?;
+        .chain(log_file);
+
+    if cli.print_logs {
+        dispatch = dispatch.chain(io::stdout());
+    }
+
+    dispatch.apply()?;
 
     Ok(log_filename)
 }
@@ -122,6 +130,15 @@ fn read_source(cli: &cli::Cli) -> Result<String> {
     Ok(buf)
 }
 
+
+fn test_streaming<'a, T>(_cli: &cli::Cli, mut stream: T) -> Result<()>
+    where T: Streaming<Item = (JsonPath<'a>, JsonData<'a>)>
+{
+    while let Some((path, item)) = stream.try_next()? {
+        println!("{path} = {item:?}");
+    }
+    Ok(())
+}
 // 16 kb = 16000 bytes
 pub const MAX_STRING_SIZE_TO_PRINT: usize = 16_000;
 
@@ -133,20 +150,10 @@ fn main() -> Result<()> {
     let log_file = configure_logging(&cli, &project_dirs)?;
 
     if cli.test_streaming {
+        log::info!("inside test streaming");
         match cli.input_filename.as_ref() {
-            Some(input_filename) => {
-                let mut tokens = crate::json::streaming::stream_tokens(input_filename)?;
-                while let Some(tok) = tokens.try_next()? {
-                    println!("{tok:?}");
-                }
-            }
-            None => {
-                let br = buffered_reader::Generic::new(io::stdin(), None);
-                let mut tokens = crate::json::streaming::StreamingTokens::from(br);
-                while let Some(tok) = tokens.try_next()? {
-                    println!("{tok:?}");
-                }
-            }
+            Some(input_filename) => test_streaming(&cli, crate::json::stream_json_file(input_filename)?)?,
+            None => test_streaming(&cli, crate::json::stream_json_from(io::stdin())?)?,
         }
         return Ok(());
     }

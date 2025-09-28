@@ -31,15 +31,16 @@ pub enum TokenType {
     CloseBracket,
     Comma,
     Colon,
+    String,
+    Number,
+    Null,
+    Boolean,
+    InvalidChar,
     Whitespace,
     Newline,
     Key,
-    String,
-    Number,
-    Boolean,
-    InvalidChar,
-    Eof,
 }
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Token<'a> {
     pub tty: TokenType,
@@ -66,6 +67,27 @@ impl TokenType {
             _ => false,
         }
 
+    }
+}
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let lit = match self {
+            TokenType::OpenBrace => "'{'",
+            TokenType::CloseBrace => "'}'",
+            TokenType::OpenBracket => "'['",
+            TokenType::CloseBracket => "']'",
+            TokenType::Comma => "','",
+            TokenType::Colon => "':'",
+            TokenType::Whitespace => "space",
+            TokenType::Newline => "newline",
+            TokenType::String => "string",
+            TokenType::Number => "number",
+            TokenType::Boolean => "boolean",
+            TokenType::Null => "null",
+            TokenType::Key => todo!(),
+            TokenType::InvalidChar => todo!(),
+        };
+        write!(f, "{lit}")
     }
 }
 

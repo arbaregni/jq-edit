@@ -121,9 +121,9 @@ pub fn token_to_span<'a>(tok: &Token<'a>) -> Span<'static> {
         TokenType::String => Style::default().fg(Color::Green),
         TokenType::Key => Style::default().fg(Color::Blue),
         TokenType::Number => Style::default().fg(Color::LightBlue),
+        TokenType::Null => Style::default().fg(Color::LightMagenta),
         TokenType::Boolean => Style::default().fg(Color::Yellow),
         TokenType::InvalidChar => Style::default().fg(Color::White).bg(Color::Red),
-        TokenType::Eof => Style::default(),
     };
     Span::styled(tok.lex.to_string(), style)
 }

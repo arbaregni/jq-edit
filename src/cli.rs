@@ -20,6 +20,10 @@ pub struct Cli {
     /// The level to log at.
     pub log_level: log::LevelFilter,
 
+    /// Print logs to stdout
+    #[arg(long)]
+    pub print_logs: bool,
+
     #[arg(long)]
     /// Supply this flag to print the log file as part of the program exit summary
     pub print_log_file_path: bool,

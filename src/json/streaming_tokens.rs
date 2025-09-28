@@ -1,22 +1,15 @@
 use buffered_reader::BufferedReader;
-use tokens::{TokenType};
-
+use tokens::TokenType;
+use crate::streaming::Streaming;
 use crate::json::*;
 
 use anyhow::{bail, Result};
 
-use std::path::Path;
-
-pub fn stream_tokens<P: AsRef<Path>>(file: P) -> Result<StreamingTokens<impl BufferedReader<CookieType>>> {
-    let reader = buffered_reader::File::open(file)?;
-    Ok(StreamingTokens::from(reader))}
-
-
-type CookieType = ();
+pub type CookieType = ();
 
 const DATA_WINDOW: usize = 1024;
 
-pub const TOKEN_LITERALS: [(TokenType, &'static str); 12] = [
+pub const TOKEN_LITERALS: [(TokenType, &'static str); 13] = [
     (TokenType::OpenBrace,      "{"),
     (TokenType::CloseBrace,     "}"),
     (TokenType::OpenBracket,    "["),
@@ -29,6 +22,7 @@ pub const TOKEN_LITERALS: [(TokenType, &'static str); 12] = [
     (TokenType::Whitespace,     " "),
     (TokenType::Boolean,        "true"),
     (TokenType::Boolean,        "false"),
+    (TokenType::Null,           "null"),
 ];
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -43,6 +37,7 @@ pub struct StreamingTokens<BR> where BR: BufferedReader<CookieType> {
 }
 
 impl <BR> StreamingTokens<BR> where BR: BufferedReader<CookieType> {
+    /// Create a stream of tokens from a buffered reader
     pub fn from(reader: BR) -> Self {
         Self {
             reader,
@@ -132,8 +127,12 @@ impl <BR> StreamingTokens<BR> where BR: BufferedReader<CookieType> {
 
         Ok(buf)
     }
+}
 
-    pub fn try_next(&mut self) -> Result<Option<Token>> {
+impl <BR> Streaming for StreamingTokens<BR> where BR: BufferedReader<CookieType> {
+    type Item = Token;
+
+    fn try_next(&mut self) -> Result<Option<Token>> {
        if self.reader.eof() {
             return Ok(None);
         }
@@ -142,9 +141,10 @@ impl <BR> StreamingTokens<BR> where BR: BufferedReader<CookieType> {
         for (tty, literal) in TOKEN_LITERALS.iter() {
 
             if self.consume_if_startswith(literal)? {
+                let lex = literal.to_string();
                 return Ok(Some(Token {
                     tty: *tty,
-                    lex: literal.to_string()
+                    lex
                 }))
             }
         }
@@ -165,11 +165,19 @@ impl <BR> StreamingTokens<BR> where BR: BufferedReader<CookieType> {
         }
 
 
-        // TODO: check for unbounded things which might require bigger tokens
-        bail!("aghhh i don't know what to do here")
-    }
+        // yield some invalid characters
+        let Some(invalid_ch) = self.peek_char()? else {
+            return Ok(None); // no more characters
+        };
+        let lex = String::from(invalid_ch);
+        return Ok(Some(Token {
+            tty: TokenType::InvalidChar,
+            lex
+        }));
+    } 
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
