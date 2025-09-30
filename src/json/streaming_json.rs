@@ -1,16 +1,15 @@
-use core::f64;
-use std::borrow::Cow;
-
 use anyhow::{bail, Result};
-use itertools::Itertools;
+
+use std::borrow::Cow;
 
 use crate::streaming::Streaming;
 use crate::json::{
     JsonData, JsonKey, JsonPath, JsonPathElement,
     tokens::TokenType,
-    streaming_tokens::Token,
+    streaming_tokens::{Token, tok_to_num, tok_to_str, tok_to_bool},
 };
 
+use super::token_stream_adaptor::TokenStreamAdaptor;
 
 pub type JsonPair<'a> = (JsonPath<'a>, JsonData<'a>);
 
@@ -40,84 +39,6 @@ impl <'a, T> StreamingJson<'a, T> where T: Streaming<Item = Token> {
     }
 }
 
-use token_stream_adaptor::TokenStreamAdaptor;
-
-mod token_stream_adaptor {
-    use super::*;
-
-    pub struct TokenStreamAdaptor<S> {
-        tokens: S,
-        // remember a peeked value, even if it was None
-        peeked: Option<Option<Token>>
-    }
-    impl <S> TokenStreamAdaptor<S> where S: Streaming<Item = Token> {
-        pub fn from(tokens: S) -> Self {
-            Self {
-                tokens,
-                peeked: None
-            }
-        }
-        fn next_nonspace_token(&mut self) -> Result<Option<Token>> {
-            while let Some(tok) = self.tokens.try_next()? {
-                if !tok.tty.is_whitespace() {
-                    return Ok(Some(tok));
-                }
-            }
-            Ok(None)
-        }
-        pub fn next_token(&mut self) -> Result<Option<Token>> {
-            match self.peeked.take() {
-                Some(v) => Ok(v),
-                None => self.next_nonspace_token()
-            }
-        }
-        pub fn peek(&mut self) -> Result<Option<&Token>> {
-            if let None = self.peeked {
-                let token = self.next_nonspace_token()?;
-                self.peeked = Some(token);
-            }
-            // SAFETY: if the variant was None, it was set above
-            let peeked_item = unsafe {
-                self.peeked.as_ref().unwrap_unchecked()
-            };
-            Ok(peeked_item.as_ref())
-        } 
-        pub fn consume_if(&mut self, token_type: TokenType) -> Result<Option<Token>> {
-            let Some(tok) = self.peek()? else {
-                // nothing consumed, nothing to consume
-                return Ok(None);
-            };
-            if tok.tty == token_type {
-                self.next_token()
-            } else {
-                Ok(None)
-            }
-        }
-
-        pub fn consume_or_fail(&mut self, token_type: TokenType, message: &str) -> Result<Token> {
-            let Some(tok) = self.next_token()? else {
-                bail!("unexpected EOF while {message}");
-            };
-            if tok.tty != token_type {
-                bail!("unexpected token {tok:?} while {message}, expected {token_type}");
-            }
-            Ok(tok)
-        }
-        pub fn consume_one_of_or_fail<const N: usize>(&mut self, token_types: [TokenType; N], message: &str) -> Result<Token> {
-            let Some(tok) = self.next_token()? else {
-                bail!("unexpected EOF while {message}");
-            };
-            if token_types.into_iter().all(|tty| tok.tty != tty) {
-                bail!("unexpected token {tok:?} while {message}, expected one of: {}", token_types
-                      .into_iter()
-                      .map(|tty| format!("{tty}"))
-                      .join(", ")
-               );
-            }
-            Ok(tok)
-        }
-    }
-}
 
 /*
 
@@ -263,71 +184,6 @@ impl <'a, T> Streaming for StreamingJson<'a, T> where T: Streaming<Item = Token>
         // Being lazy in keeping it like this.
         return Ok(Some(json_pair))
     }
-}
-fn tok_to_num(token: &Token) -> Result<JsonData<'static>> {
-    use IntOrFloat::*;
-
-    let value = match token.lex.as_str() {
-        "inf" => JsonData::Float { value: f64::INFINITY },
-        "-inf" => JsonData::Float { value: f64::NEG_INFINITY },
-        input => match parse_scientific_notation(input)? {
-            Int(value) => JsonData::Number { value },
-            Float(value) => JsonData::Float { value },
-        }
-    };
-    Ok(value)
-}
-
-fn tok_to_bool(token: &Token) -> Result<JsonData<'static>> {
-    let value = token.lex.as_str().parse()?;
-    Ok(JsonData::Boolean { value })
-}
-fn tok_to_str(token: &Token) -> Result<JsonData<'static>> {
-    let value = enquote::unescape(&token.lex, None)?;
-    let value = Cow::Owned(value); 
-    Ok(JsonData::Str { value })
-}
-
-
-enum IntOrFloat {
-    Int(i64),
-    Float(f64)
-}
-fn parse_scientific_notation(input: &str) -> Result<IntOrFloat> {
-    let value = match input.split_once(&['e', 'E']) {
-        Some((mantissa, exponent)) => {
-            use IntOrFloat::*;
-
-            let mantissa = parse_maybe_decimal(mantissa)?;
-            let exponent: i32 = exponent.parse()?;
-            match mantissa {
-                Int(m) => {
-                    let exp: u32 = exponent.abs().try_into()?;
-                    if exponent >= 0 {
-                        Int(m * 10i64.pow(exp))
-                    } else if (m % 10i64.pow(exp)) == 0 {
-                        Int(m / 10i64.pow(exp))
-                    } else {
-                        Float(m as f64 * 10f64.powi(exponent))
-                    }
-                }
-                Float(m) => Float(m * 10f64.powi(exponent))
-            }
-        }
-        None => parse_maybe_decimal(input)?,
-    };
-    Ok(value)
-}
-
-fn parse_maybe_decimal(input: &str) -> Result<IntOrFloat> {
-    if input.contains(".") {
-        let value = input.parse()?;
-        Ok(IntOrFloat::Float(value))
-    } else {
-        let value = input.parse()?;
-        Ok(IntOrFloat::Int(value))
-    }
-
 }
 
 #[cfg(test)]

@@ -10,11 +10,14 @@ use ratatui::{
     }
 };
 
+use anyhow::Result;
+
 use crate::{
-    json::tokens::{
+    json::{tokens::{
         Token,
         TokenType,
-    },
+    }, JsonData, JsonPath},
+    streaming::Streaming,
     ui
 };
 
@@ -63,6 +66,15 @@ impl <'a> ScrollText<'a> {
             line_offset: 0,
             lines
         }
+    }
+    pub fn from_stream<'b, S: Streaming<Item = (JsonPath<'b>, JsonData<'b>)>>(tokens: S) -> Result<ScrollText<'a>> {
+        let mut lines = Vec::new();
+       // TODO: this won't work
+
+        Ok(Self {
+            line_offset: 0,
+            lines
+        })
     }
 
     pub fn scroll_up(&mut self) {

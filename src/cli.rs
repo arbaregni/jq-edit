@@ -37,6 +37,7 @@ pub struct Cli {
     pub self_parse_json: bool,
 }
 
+
 fn parse_bool(s: &str) -> Result<bool, &'static str> {
 
     match s.to_lowercase().as_str() {

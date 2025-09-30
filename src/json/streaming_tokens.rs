@@ -33,6 +33,80 @@ pub struct Token {
     pub lex: String,
 }
 
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: improve this
+        write!(f, "{} {}", self.lex, self.tty)
+    }
+}
+
+pub fn tok_to_num(token: &Token) -> Result<JsonData<'static>> {
+    use IntOrFloat::*;
+
+    let value = match token.lex.as_str() {
+        "inf" => JsonData::Float { value: f64::INFINITY },
+        "-inf" => JsonData::Float { value: f64::NEG_INFINITY },
+        input => match parse_scientific_notation(input)? {
+            Int(value) => JsonData::Number { value },
+            Float(value) => JsonData::Float { value },
+        }
+    };
+    Ok(value)
+}
+
+pub fn tok_to_bool(token: &Token) -> Result<JsonData<'static>> {
+    let value = token.lex.as_str().parse()?;
+    Ok(JsonData::Boolean { value })
+}
+pub fn tok_to_str(token: &Token) -> Result<JsonData<'static>> {
+    let value = enquote::unescape(&token.lex, None)?;
+    let value = Cow::Owned(value); 
+    Ok(JsonData::Str { value })
+}
+
+
+enum IntOrFloat {
+    Int(i64),
+    Float(f64)
+}
+fn parse_scientific_notation(input: &str) -> Result<IntOrFloat> {
+    let value = match input.split_once(&['e', 'E']) {
+        Some((mantissa, exponent)) => {
+            use IntOrFloat::*;
+
+            let mantissa = parse_maybe_decimal(mantissa)?;
+            let exponent: i32 = exponent.parse()?;
+            match mantissa {
+                Int(m) => {
+                    let exp: u32 = exponent.abs().try_into()?;
+                    if exponent >= 0 {
+                        Int(m * 10i64.pow(exp))
+                    } else if (m % 10i64.pow(exp)) == 0 {
+                        Int(m / 10i64.pow(exp))
+                    } else {
+                        Float(m as f64 * 10f64.powi(exponent))
+                    }
+                }
+                Float(m) => Float(m * 10f64.powi(exponent))
+            }
+        }
+        None => parse_maybe_decimal(input)?,
+    };
+    Ok(value)
+}
+
+fn parse_maybe_decimal(input: &str) -> Result<IntOrFloat> {
+    if input.contains(".") {
+        let value = input.parse()?;
+        Ok(IntOrFloat::Float(value))
+    } else {
+        let value = input.parse()?;
+        Ok(IntOrFloat::Int(value))
+    }
+
+}
+
+
 pub struct StreamingTokens<BR> where BR: BufferedReader<CookieType> {
     reader: BR,
     byte_index: usize

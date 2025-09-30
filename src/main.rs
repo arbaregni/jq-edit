@@ -7,6 +7,7 @@ mod app;
 mod input;
 mod my_line_editor;
 mod scroll_text;
+mod json_renderer;
 
 use std::{
     fs::{self, File},
@@ -22,7 +23,7 @@ use clap::Parser;
 
 use directories::ProjectDirs;
 use streaming::Streaming;
-use json::{JsonData, JsonPath};
+use json::{JsonData, JsonFragment, JsonPath};
 use ratatui::{
     crossterm::{
         terminal::{
@@ -132,7 +133,7 @@ fn read_source(cli: &cli::Cli) -> Result<String> {
 
 
 fn test_streaming<'a, T>(_cli: &cli::Cli, mut stream: T) -> Result<()>
-    where T: Streaming<Item = (JsonPath<'a>, JsonData<'a>)>
+    where T: Streaming<Item = (JsonPath<'a>, JsonFragment<'a>)>
 {
     while let Some((path, item)) = stream.try_next()? {
         println!("{path} = {item:?}");
@@ -152,8 +153,8 @@ fn main() -> Result<()> {
     if cli.test_streaming {
         log::info!("inside test streaming");
         match cli.input_filename.as_ref() {
-            Some(input_filename) => test_streaming(&cli, crate::json::stream_json_file(input_filename)?)?,
-            None => test_streaming(&cli, crate::json::stream_json_from(io::stdin())?)?,
+            Some(input_filename) => test_streaming(&cli, crate::json::stream_json_fragments_from_file(input_filename)?)?,
+            None => test_streaming(&cli, crate::json::stream_json_fragments_from(io::stdin())?)?,
         }
         return Ok(());
     }

@@ -9,21 +9,42 @@ pub mod tokens;
 
 mod streaming_json;
 mod streaming_tokens;
+mod streaming_json_fragments;
+mod token_stream_adaptor;
 
-pub fn stream_json_file<P: AsRef<Path>>(path: P) -> Result<impl streaming::Streaming<Item = (JsonPath<'static>, JsonData<'static>)>> {
+pub mod tokens_to;
+
+pub fn stream_json_fragments_from_file<P: AsRef<Path>>(path: P) -> Result<impl streaming::Streaming<Item = (JsonPath<'static>, JsonFragment<'static>)>> {
     let br = buffered_reader::File::open(path)?;
     let tokens = streaming_tokens::StreamingTokens::from(br);
-    let stream = streaming_json::StreamingJson::from(tokens);
+    let stream = streaming_json_fragments::StreamingJson::from(tokens);
     Ok(stream)
 }
-
-pub fn stream_json_from<R: std::io::Read + Send + Sync>(reader: R) -> Result<impl streaming::Streaming<Item = (JsonPath<'static>, JsonData<'static>)>> {
+pub fn stream_json_fragments_from<R: std::io::Read + Send + Sync>(reader: R) -> Result<impl streaming::Streaming<Item = (JsonPath<'static>, JsonFragment<'static>)>> {
     let br = buffered_reader::Generic::new(reader, None);
     let tokens = streaming_tokens::StreamingTokens::from(br);
-    let stream = streaming_json::StreamingJson::from(tokens);
+    let stream = streaming_json_fragments::StreamingJson::from(tokens);
     Ok(stream)
 }
 
+
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum JsonFragment<'a> {
+    /// Emits when a dictionary begins
+    BeginDict,
+    /// Emits when a dictionary ends
+    EndDict,
+    /// Emits when an array begins
+    BeginArray,
+    /// Emits when an array should be ended
+    EndArray,
+    /// Emits for a json atom
+    Atom(JsonData<'a>),
+    /// Emits for invalid data. Can safely ignore
+    Invalid(Cow<'a, str>),
+}
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -143,6 +164,11 @@ impl <'a> JsonPath <'a> {
 
 impl <'a> std::fmt::Display for JsonPath<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.index_in_stream == 0 && self.elems.len() == 0 {
+            write!(f, ".")?;
+            return Ok(());
+        }
+
         if self.index_in_stream > 0 {
             write!(f, "nth({})", self.index_in_stream)?;
             if self.elems.len() > 0 {

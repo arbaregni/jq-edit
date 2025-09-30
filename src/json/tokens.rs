@@ -1,3 +1,4 @@
+use anyhow::Result;
 use regex::Regex;
 use once_cell::sync::Lazy;
 
@@ -90,7 +91,6 @@ impl std::fmt::Display for TokenType {
         write!(f, "{lit}")
     }
 }
-
 pub fn tokenize(source: &str) -> Vec<Token> {
     let mut ctx = TokenizeContext::from(source);
     while ctx.source.len() > 0 {
