@@ -1,10 +1,12 @@
 
+use std::borrow::Cow;
+
 use anyhow::Result;
 
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::Style,
+    style::{Color, Style},
     text::Line,
     widgets::{
         block::BlockExt,
@@ -13,72 +15,85 @@ use ratatui::{
     }
 };
 
-use crate::streaming::Streaming;
+use crate::{json::JsonPathElement, streaming::Streaming};
 use crate::json::{
     JsonData,
-    JsonPath
+    JsonPath,
+    JsonFragment
 };
 
-pub fn render_to_lines<'a, S>(json_stream: &mut S, lines: &mut Vec<Line<'a>>) -> Result<()>
-    where S: Streaming<Item = (JsonPath<'a>, JsonData<'a>)>
+pub fn render_to_lines<'a, S>(json_stream: &mut S, lines: &mut Vec<Line<'a>>, line_cap: usize) -> Result<()>
+    where S: Streaming<Item = (JsonPath<'a>, JsonFragment<'a>)>
 {
-    let mut idx = 0;
-    let mut curr_path = JsonPath::empty();
+    log::info!("rendering to lines...");
 
     let mut line_renderer = LineRenderer::from(lines);
 
-    while let Some((next_path, json_data)) = json_stream.try_next()? {
+    let mut lines_rendered = 0;
+
+    while let Some((next_path, json_fragment)) = json_stream.try_next()? {
+        log::debug!("received json fragment {json_fragment:?}");
 
         use crate::json::JsonFragment::*;
 
-       /* for token in curr_path.tokens_to(&next_path) {
+        line_renderer.write_indent();
 
-            match token {
-                BeginDict => {
-                    line_renderer
-                        .write_indent()
-                        .write_punctuation("{")
-                        .finish_line()
-                        .increase_indent();
-                }
-                EndDict => {
-                    line_renderer
-                        .decrease_indent()
-                        .write_indent()
-                        .write_punctuation("}")
-                        .finish_line();
-                }
-                BeginArray => {
-                    line_renderer
-                        .write_indent()
-                        .write_punctuation("[")
-                        .finish_line()
-                        .increase_indent();
-                }
-                EndArray => {
-                    line_renderer
-                        .decrease_indent()
-                        .write_indent()
-                        .write_punctuation("]")
-                        .finish_line();
-                }
-                NextItem => {
-                    line_renderer
-                        .write_punctuation(",")
-                        .finish_line();
-                },
-                NextObject => {
-                    /* nothing to do */
-                }
-            }
-
-
+        if let Some(JsonPathElement::PropertyInObject { key }) = next_path.last() {
+            line_renderer
+                .write_styled(enquote::enquote('"', key.to_lexeme()), Style::default().fg(Color::Blue))
+                .write_punctuation(": ");
         }
-    */
 
+        match json_fragment {
+            BeginDict => {
+                line_renderer
+                    .write_punctuation("{")
+                    .increase_indent()
+            }
+            EndDict => {
+                line_renderer
+                    .decrease_indent()
+                    .write_punctuation("}")
+            }
+            BeginArray => {
+                line_renderer
+                    .write_punctuation("[")
+                    .increase_indent()
+            }
+            EndArray => {
+                line_renderer
+                    .decrease_indent()
+                    .write_punctuation("]")
+            },
+            Atom(JsonData::Null) => {
+                line_renderer.write_styled("null", Style::default().fg(Color::LightMagenta))
+            }
+            Atom(JsonData::Str { value }) => {
+                line_renderer.write_styled(enquote::enquote('"', &value), Style::default().fg(Color::Green))
+            }
+            Atom(JsonData::Number { value }) => {
+                line_renderer.write_styled(format!("{value}"), Style::default().fg(Color::LightBlue))
+            }
+            Atom(JsonData::Float { value }) => {
+                line_renderer.write_styled(format!("{value}"), Style::default().fg(Color::LightBlue))
+            }
+            Atom(JsonData::Boolean { value }) => {
+                line_renderer.write_styled(format!("{value}"), Style::default().fg(Color::Yellow))
+            }
+            Invalid(invalid) => {
+                line_renderer.write_styled(invalid, Style::default().bg(Color::Red).fg(Color::White))
+            }
+            Atom(json) => todo!("handle formatting {json:?}")
+        };
+        line_renderer.finish_line();
 
-
+        lines_rendered += 1;
+        if lines_rendered >= line_cap {
+            break;
+        }
     }
+
+    line_renderer.flush();
 
     Ok(())
 }
@@ -128,9 +143,11 @@ mod line_renderer {
         pub fn write_punctuation(&mut self, string: &'data str) -> &mut Self {
             self.write_styled(string, Style::default())
         }
-        pub fn write_styled(&mut self, string: &'data str, style: Style) -> &mut Self {
+
+       pub fn write_styled<S: Into<Cow<'data, str>>>(&mut self, string: S, style: Style) -> &mut Self {
             self.write_span(Span::styled(string, style))
         }
+
         pub fn write_default(&mut self, string: &'data str) -> &mut Self {
             self.write_span(Span::from(string))
         }
@@ -143,6 +160,17 @@ mod line_renderer {
             let line = Line::from(self.curr_line.clone());
             self.lines.push(line);
             self.curr_line.clear();
+            self
+        }
+        pub fn flush(&mut self) -> &mut Self {
+            if self.curr_line.len() == 0 {
+                return self;
+            }
+            let mut curr_line = Vec::new();
+            std::mem::swap(&mut curr_line, &mut self.curr_line); // this clears self.curr_line and
+                                                                 // gives us ownership of the array
+            let line = Line::from(curr_line);
+            self.lines.push(line);
             self
         }
 

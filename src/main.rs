@@ -132,12 +132,18 @@ fn read_source(cli: &cli::Cli) -> Result<String> {
 }
 
 
-fn test_streaming<'a, T>(_cli: &cli::Cli, mut stream: T) -> Result<()>
-    where T: Streaming<Item = (JsonPath<'a>, JsonFragment<'a>)>
+fn test_streaming<T>(cli: &cli::Cli, stream: T) -> Result<()>
+    where T: Streaming<Item = (JsonPath<'static>, JsonFragment<'static>)>
 {
-    while let Some((path, item)) = stream.try_next()? {
+    log::info!("initializing app with streaming...");
+    let mut app = crate::app::App::init(cli, "", Some(stream));
+
+    app.submit_query();
+    run(&cli, &mut app).expect("running app");
+
+    /*while let Some((path, item)) = stream.try_next()? {
         println!("{path} = {item:?}");
-    }
+    }*/
     Ok(())
 }
 // 16 kb = 16000 bytes
@@ -149,6 +155,9 @@ fn main() -> Result<()> {
     let project_dirs = ProjectDirs::from("", "arbaregni", "jq-edit").expect("initialize project directories");
 
     let log_file = configure_logging(&cli, &project_dirs)?;
+    if cli.print_log_file_path {
+        println!("LOG_FILE: {}", log_file);
+    }
 
     if cli.test_streaming {
         log::info!("inside test streaming");
@@ -165,7 +174,15 @@ fn main() -> Result<()> {
     // just leak the string now and let the OS deal with it
     let source = source.leak();
 
-    let mut app = crate::app::App::init(&cli, source);
+    enum Never{}
+    impl Streaming for Never {
+        type Item = (JsonPath<'static>, JsonFragment<'static>);
+
+        fn try_next(&mut self) -> Result<Option<Self::Item>> {
+            match *self { }
+        }
+    }
+    let mut app = crate::app::App::<Never>::init(&cli, source, None);
 
     // submit the query once to jq; this will provide the formatting and colorization
     app.submit_query();
@@ -177,10 +194,6 @@ fn main() -> Result<()> {
 
     run(&cli, &mut app)
         .expect("running app");
-
-    if cli.print_log_file_path {
-        println!("LOG_FILE: {}", log_file);
-    }
 
     if app.filtered_content().len() < MAX_STRING_SIZE_TO_PRINT {
         println!("=============================================");
@@ -198,7 +211,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run(cli: &cli::Cli, app: &mut app::App) -> Result<()> {
+fn run<S: streaming::Streaming<Item=(JsonPath<'static>, JsonFragment<'static>)>>(cli: &cli::Cli, app: &mut app::App<S>) -> Result<()> {
     // Set up the terminal for rendering
     log::info!("enabling raw terminal mode");
     enable_raw_mode()?;

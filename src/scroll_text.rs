@@ -16,9 +16,7 @@ use crate::{
     json::{tokens::{
         Token,
         TokenType,
-    }, JsonData, JsonPath},
-    streaming::Streaming,
-    ui
+    }, JsonData, JsonFragment, JsonPath}, json_renderer, streaming::Streaming, ui
 };
 
 #[derive(Debug)]
@@ -67,9 +65,12 @@ impl <'a> ScrollText<'a> {
             lines
         }
     }
-    pub fn from_stream<'b, S: Streaming<Item = (JsonPath<'b>, JsonData<'b>)>>(tokens: S) -> Result<ScrollText<'a>> {
+    pub fn from_stream<'b: 'a, S: Streaming<Item = (JsonPath<'b>, JsonFragment<'b>)>>(json_stream: &mut S, line_cap: usize) -> Result<ScrollText<'a>> {
         let mut lines = Vec::new();
-       // TODO: this won't work
+
+        json_renderer::render_to_lines(json_stream, &mut lines, line_cap)?;
+
+        log::info!("rendered {} lines", lines.len());
 
         Ok(Self {
             line_offset: 0,

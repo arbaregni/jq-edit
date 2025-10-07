@@ -9,11 +9,11 @@ use ratatui::
         }
 ;
 
-use crate::app::App;
+use crate::{app::App, json::{JsonFragment, JsonPath}, streaming};
 
 const POLL_DURATION: std::time::Duration = std::time::Duration::from_millis(50);
 
-pub fn handle_events(app: &mut App) -> Result<()> {
+pub fn handle_events<S: streaming::Streaming<Item = (JsonPath<'static>, JsonFragment<'static>)>>(app: &mut App<S>) -> Result<()> {
     if !event::poll(POLL_DURATION)? {
         return Ok(());
     }

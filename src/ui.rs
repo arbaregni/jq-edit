@@ -25,14 +25,14 @@ use crate::{
         App,
         ErrorPanel
     },
-    json::tokens::{
+    json::{tokens::{
         Token,
         TokenType
-    }
+    }, JsonFragment, JsonPath}, streaming
 };
 
 
-pub fn render_app(app: &App, frame: &mut Frame) {
+pub fn render_app<S: streaming::Streaming<Item = (JsonPath<'static>, JsonFragment<'static>)>>(app: &App<S>, frame: &mut Frame) {
     // the number of lines to spend on error message
     let error_len = match app.error.as_ref() {
         None => 0,
@@ -77,7 +77,7 @@ pub fn render_app(app: &App, frame: &mut Frame) {
 
 }
 
-pub fn set_query_editor_styles(app: &mut App) {
+pub fn set_query_editor_styles<S: streaming::Streaming<Item = (JsonPath<'static>, JsonFragment<'static>)>>(app: &mut App<S>) {
     let line_style = Style::default();
     app.query_editor.set_cursor_line_style(line_style);
 

@@ -85,6 +85,11 @@ impl <'a> From<&'a str> for JsonKey<'a> {
         Self { inner }
     }
 }
+impl <'a> JsonKey<'a> {
+    pub fn to_lexeme(&self) -> &str {
+        self.inner.as_ref()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JsonPathElement<'a> {
@@ -156,6 +161,11 @@ impl <'a> JsonPath <'a> {
     /// Warning ! just advances a top level item
     pub fn next_in_stream(&mut self) {
         self.index_in_stream += 1;
+    }
+
+    // Accessors
+    pub fn last(&self) -> Option<&JsonPathElement<'a>> {
+        self.elems.last()
     }
 
 

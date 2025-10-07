@@ -5,12 +5,12 @@ use crate::{
     cli::Cli, jq_cli::{
         self, JqClient
     }, 
-    json::tokens,
-    scroll_text::ScrollText
+    json::{tokens, JsonFragment, JsonPath},
+    scroll_text::ScrollText, streaming::Streaming
 };
 
 #[derive(Debug)]
-pub struct App {
+pub struct App<S> {
     /// The original json data from standard in.
     pub original: &'static str,
 
@@ -35,6 +35,8 @@ pub struct App {
 
     /// Whether to colorize the filtered query
     pub colorize: bool,
+
+    pub json_stream: Option<S>,
 }
 
 #[derive(Debug)]
@@ -43,8 +45,8 @@ pub struct ErrorPanel {
     pub failure: String,
 }
 
-impl App {
-    pub fn init(cli: &Cli, original: &'static str) -> App {
+impl <S> App<S> where S: Streaming<Item = (JsonPath<'static>, JsonFragment<'static>)> {
+    pub fn init(cli: &Cli, original: &'static str, json_stream: Option<S>) -> App<S> {
         let initial_query = cli.query.clone().unwrap_or(String::new());
 
         let mut query_editor = TextArea::from(vec![initial_query]);
@@ -60,6 +62,7 @@ impl App {
             error: None,
             clear_screen: false,
             colorize: cli.colorize,
+            json_stream,
         }
     }
 
@@ -109,12 +112,20 @@ impl App {
         // todo: do we need this?
         self.filtered = content.clone();
 
-        if self.colorize {
+        log::info!("setting display content...");
+        if let Some(stream) = &mut self.json_stream {
+            log::info!("initializing scroll text from stream...");
+            let line_cap = 100;
+            self.scroll_text = ScrollText::from_stream(stream, line_cap).expect("to succeed");
+        } else if self.colorize {
             let tokens = tokens::tokenize(content.as_str());
             self.scroll_text = ScrollText::from_tokens(tokens.as_slice());
         } else {
             self.scroll_text = ScrollText::from_content(content);
         }
+
+
+        log::info!("rendered = {:?}", self.scroll_text);
     }
 
     /// Called when the user scrolls the text area
