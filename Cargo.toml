@@ -1,6 +1,6 @@
 [package]
 name = "jq-edit"
-version = "0.1.0"
+version = "0.1.20251006"
 edition = "2021"
 
 [dependencies]

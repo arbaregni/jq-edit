@@ -138,7 +138,17 @@ impl <BR> StreamingTokens<BR> where BR: BufferedReader<CookieType> {
 
     fn data_as_utf8(&mut self, amount: usize) -> Result<Cow<'_, str>> {
         let data = self.reader.data(amount)?;
-        Ok(String::from_utf8_lossy(data))
+        let valid_utf8 = match str::from_utf8(&data[..]) {
+            Ok(valid_utf8) => return Ok(Cow::Borrowed(valid_utf8)),
+            Err(e) => &data[..e.valid_up_to()],
+        };
+
+        let data_as_str = unsafe {
+            // SAFETY - the first pass already found the valid utf8
+            str::from_utf8_unchecked(valid_utf8)
+        };
+
+        Ok(Cow::Borrowed(data_as_str))
     }
 
     fn peek_char(&mut self) -> Result<Option<char>> {
